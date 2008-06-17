@@ -83,6 +83,16 @@ public class SubsystemOutputStream extends OutputStream {
         super.write(b, off, len);
         processMessage();
     }
+    
+    @Override
+    public void close() throws IOException {
+    	try {
+    		LOG.debug("Closing subsystem output stream");
+    		processMessage();
+    	} finally {
+    		super.close();
+    	}
+    }
 
     /**
      *
@@ -100,11 +110,9 @@ public class SubsystemOutputStream extends OutputStream {
         if (buffer.size() > (messageStart + LENGTH_BYTES)) {
             int messageLength = (int) ByteArrayReader.readInt(buffer.toByteArray(),
                     messageStart);
-            //LOG.debug("First 4 bytes say message will be "+messageLength+" long");
             
-
             if (messageLength + messageStart <= (buffer.size() - LENGTH_BYTES)) {
-            	//LOG.debug("There are "+(buffer.size() - 4)+" bytes in the buffer, so let's go");
+            	//LOG.debug("Message: "+messageLength+", messageStart:"+messageStart+", buffer:"+(buffer.size() - LENGTH_BYTES));
                 byte[] msgdata = new byte[messageLength];
 
                 // Process a message
@@ -119,19 +127,19 @@ public class SubsystemOutputStream extends OutputStream {
                         ime.getMessage());
                 }
 
-                if (messageLength == (buffer.size() - LENGTH_BYTES)) {
-                	//LOG.debug("Message length reaches end of buffer");
+                if (messageLength + messageStart == (buffer.size() - LENGTH_BYTES)) {
+                	//LOG.debug("Message reaches end of buffer. resetting it.");
                     buffer.reset();
                     messageStart = 0;
                 } else {
-                	//LOG.debug("Not finish, so let's read some more");
-                    messageStart = messageLength + LENGTH_BYTES;
+                	//LOG.debug("Extra bytes at the end of the message. Moving messageStart.");
+                    messageStart += messageLength + LENGTH_BYTES;
                 }
             } else {
             	//LOG.debug("Not enough bytes in buffer to make the message");
             }
         } else {
-        	//LOG.debug("Haven't received the message length yet");
+        	LOG.debug("Haven't received the message length yet");
         }
     }
 }
