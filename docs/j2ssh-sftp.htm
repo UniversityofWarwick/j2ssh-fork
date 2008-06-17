@@ -1,0 +1,127 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"
+"http://www.w3.org/TR/html4/loose.dtd">
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1">
+<title>Untitled Document</title>
+</head>
+
+<body>
+<h2><font face="Verdana, Arial, Helvetica, sans-serif"><a name="top"></a>J2SSH - SFTP Client Connectivity </font></h2>
+<p><font size="2" face="Verdana, Arial, Helvetica, sans-serif"><a href="#makeconnection">Making 
+      the connection</a><br>
+  <a href="#readfile">Reading a file</a><br>
+  <a href="#sendfile">Sending Files</a><br>
+  <a href="#delfile">Deleting Files or Directories</a><br>
+  <a href="#createdir">Creating a Directory</a><br>
+  <a href="#createnesteddir">Creating Nested Directories</a><br>
+  <a href="#renamefiles">Renaming Files</a><br>
+  <a href="#chmodfiles">Changing permissions on files</a></font></p>
+<p><br>
+  <strong><font size="2" face="Verdana, Arial, Helvetica, sans-serif"> Introduction</font></strong></p>
+<p><font size="2" face="Verdana, Arial, Helvetica, sans-serif">SFTP is an interactive 
+  file transfer protocol which performs all operations over the SSH transport, 
+  it is a replacement for the original SCP (Secure Copy) protocol that existed 
+  in SSH1. It is highly recommended that SFTP be used to perform file transfers 
+  in preference to the legacy FTP protocol as authentication details are transmitted 
+  in plain-text format with the latter, and as such may be compromised through 
+  "password sniffing" attacks.</font></p>
+<p><font size="2" face="Verdana, Arial, Helvetica, sans-serif"> The following 
+J2SSH namespace must be imported into a class wishing to incorporate SFTP functionality:<br>
+</font>
+<blockquote>
+  <pre><font size="2">import com.sshtools.j2ssh.SftpClient;</font></pre>
+</blockquote>
+<p><font size="2" face="Verdana, Arial, Helvetica, sans-serif"><strong><a name="makeconnection"></a>Making 
+  the connection</strong><br>
+  In order to transfer files through SFTP, you must first open an SftpClient connection 
+  from a connected and authenticated SshClient object. This will initialise the 
+  SFTP subsystem for usage.</font> </p>
+<blockquote><pre>SftpClient sftp = ssh.openSftpClient();</pre></blockquote>
+<p><font size="2" face="Verdana, Arial, Helvetica, sans-serif"> </font><font size="2" face="Verdana, Arial, Helvetica, sans-serif"><strong>Reading 
+  a file</strong><a name="readfile"></a><br>
+  In order to read a file you should use the get method of the SftpClient.</font> 
+</p>
+<blockquote> 
+  <pre><font size="2">// Copy the file to the local computer<br>sftp.get("temp.exe", "c:/temp.exe");</font><font size="2" face="Verdana, Arial, Helvetica, sans-serif"></font></pre>
+</blockquote>
+<font size="2" face="Verdana, Arial, Helvetica, sans-serif">
+<p><font size="2" face="Verdana, Arial, Helvetica, sans-serif"><strong> Sending 
+  Files<a name="sendfile"></a></strong></font></p>
+<p><font size="2" face="Verdana, Arial, Helvetica, sans-serif">Use the put command 
+  to send files to the server.</font></p>
+</font> 
+<blockquote> 
+  <pre><font size="2">// Sends a file to the remote server
+sftp.put("c:/temp.exe", "/root/temp.exe");</font></pre>
+</blockquote>
+<font size="2" face="Verdana, Arial, Helvetica, sans-serif">
+<p><font size="2" face="Verdana, Arial, Helvetica, sans-serif"></font><font size="2" face="Verdana, Arial, Helvetica, sans-serif"><strong>Deleting 
+  Files or Directories<a name="delfile"></a></strong></font></p>
+<p><font size="2" face="Verdana, Arial, Helvetica, sans-serif">Use the rm command 
+  to delete files or empty directories.</font></p>
+</font> 
+<blockquote> 
+  <pre><font size="2">sftp.rm(authorizationFile + ".bak");</font><font size="2" face="Verdana, Arial, Helvetica, sans-serif"></font></pre>
+</blockquote>
+<font size="2" face="Verdana, Arial, Helvetica, sans-serif">
+<p><font size="2" face="Courier New, Courier, mono"><strong></strong></font><font size="2" face="Courier New, Courier, mono"><strong><font face="Verdana, Arial, Helvetica, sans-serif">Creating 
+  a Directory<a name="createdir"></a></font></strong></font></p>
+<p><font size="2" face="Verdana, Arial, Helvetica, sans-serif">Use the mkdir command 
+  to create a new directory, the new directory will be placed in the current SFTP 
+  directory.</font></p>
+</font> 
+<blockquote> 
+  <pre><font size="2">sftp.mkdir("newdir");</font></pre>
+</blockquote>
+<font size="2" face="Verdana, Arial, Helvetica, sans-serif">
+<p><font size="2" face="Verdana, Arial, Helvetica, sans-serif"><strong> <a name="createnesteddir"></a>Creating 
+  Nested Directories</strong></font></p>
+<p><font size="2" face="Verdana, Arial, Helvetica, sans-serif">You can use the 
+  mkdirs command to create nested directory structure quickly. This method will 
+  create any directories that are not present in the directory path parameter.</font></p>
+</font> 
+<blockquote> 
+  <pre><font size="2">// Creates four new nested directories in one go
+sftp.mkdirs("/root/new/new2/new3/new4");</font></pre>
+</blockquote>
+<font size="2" face="Verdana, Arial, Helvetica, sans-serif">
+<p><font size="2" face="Verdana, Arial, Helvetica, sans-serif"><strong> <a name="renamefiles" id="renamefiles"></a>Renaming 
+  Files</strong></font></p>
+<p><font size="2" face="Verdana, Arial, Helvetica, sans-serif">To rename a file 
+  or directory use the rename command on the SftpClient object.</font></p>
+</font> 
+<blockquote> 
+  <pre><font size="2" face="Verdana, Arial, Helvetica, sans-serif"> </font><font size="2">sftp.rename("FromName.txt", "ToName.txt");</font></pre>
+</blockquote>
+<p><font size="2" face="Verdana, Arial, Helvetica, sans-serif"><strong><a name="chmodfiles"></a>Changing 
+  Permissions on Files</strong></font></p>
+<p><font size="2" face="Verdana, Arial, Helvetica, sans-serif">In order to change 
+  permissions associated with files, we use the chmod method of the SftpClient 
+  class to specify permissions in an octal format. The relevant octal values are 
+  listed below.</font></p>
+<blockquote>
+  <pre>sftp.chmod(666, "/root/temp.exe");</pre>
+</blockquote>
+<p><font size="2" face="Verdana, Arial, Helvetica, sans-serif">Absolute modes 
+  are octal numbers specifying the complete list of attributes for the files. 
+  You specify attributes by OR'ing together these bits:</font></p>
+<blockquote>
+  <p><font size="2" face="Verdana, Arial, Helvetica, sans-serif">01000000 temporary 
+    file <br>
+    02000000 compressed file <br>
+    4000 Hidden file (setuid bit) <br>
+    2000 System file (setgid bit) <br>
+    1000 Archive bit (sticky bit) <br>
+    0400 Individual read <br>
+    0200 Individual write <br>
+    0100 Individual execute (or list directory) <br>
+    0040 Group read <br>
+    0020 Group write <br>
+    0010 Group execute <br>
+    0004 Other read <br>
+    0002 Other write <br>
+    0001 Other execute</font></p>
+</blockquote>
+</body>
+</html>

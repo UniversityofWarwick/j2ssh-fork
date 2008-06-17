@@ -1,0 +1,333 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"
+"http://www.w3.org/TR/html4/loose.dtd">
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1">
+<title>Untitled Document</title>
+</head>
+
+<body>
+<h2><font face="Verdana, Arial, Helvetica, sans-serif"><b>Part Three - SSH Channels</b> </font><font face="Verdana, Arial, Helvetica, sans-serif">
+</font></h2>
+<font face="Verdana, Arial, Helvetica, sans-serif">
+<p><font size="2">We need to understand the SSH channel process in order to continue, 
+  so what are channels? All terminal sessions, forwarded connections, etc. are 
+  channels. Either side may open a channel and multiple channels are multiplexed 
+  into a single connection. Channels are flow-controlled, that is no data may 
+  be sent to a channel until a message is received to indicate that window space 
+  is available.</font></p>
+<p><font size="2">Channels can be whatever you want them to be, there are many 
+  channel types already defined within the SSH protocol specification, such as 
+  the 'session' or 'tcpip-forward' channels. These are the mechanism that provide 
+  the transport for your session and port forwarding data.</font></p>
+<p><font size="2">When you want to open a channel you send a request to the SSH 
+  server, the server will then either respond to that request with a confirmation 
+  or failure message. Your channel is identified by a name, for instance lets 
+  say we want to create a channel to echo information back to the client, we would 
+  call the channel "echo@3sp.com";. You should always name your channel 
+  using the name@domain syntax.</font></p>
+<p><font size="2">J2SSH provides a mechanism for developing custom channels, the 
+  com.sshtools.j2ssh.connection package contains a number of classes to help you. 
+  First the Channel class is the abstract base for all channels. Lets take a look 
+  at its abstract methods, the first method is self explainitory, it returns the 
+  name/type of the channel.</font></p>
+</font> 
+<blockquote>
+  <pre>public String getChannelType() {
+  return "echo@3sp.com";
+}
+</pre>
+</blockquote>
+<font size="2" face="Verdana, Arial, Helvetica, sans-serif"><p>The next two methods 
+provide the settings for the flow control. The values returned by the following 
+mehtods set the boundary for the window space. The channel will never provide 
+more window space than the maximum and will increase window space automatically 
+(back up to the maximum) when the minimum is reached. </p>
+</font> 
+<blockquote>
+  <pre>protected int getMinimumWindowSpace() {
+  return 1024;
+  }
+protected int getMaximumWindowSpace() {
+  return 65535;
+  }
+</pre>
+</blockquote>
+<p><font size="2" face="Verdana, Arial, Helvetica, sans-serif">The maximum packet 
+  size setting is the maximum amount of data that the remote side can send in 
+  one single packet. This value should not exceed the maximum window space.</font></p>
+<blockquote> 
+  <pre>protected int getMaximumPacketSize() {
+  return 32768;
+}</pre>
+</blockquote>
+<p><font size="2" face="Verdana, Arial, Helvetica, sans-serif">When a request is made to 
+  open a channel, the client can send some data with the open request so that 
+  the server may process the request based on additional information. Your channel 
+  should return this information (if any) in the getChannelOpenData method, if 
+  there is no data simply return null.</font></p>
+<blockquote> 
+  <pre>public byte[] getChannelOpenData() {
+  return null;
+}</pre>
+</blockquote>
+<p><font size="2" face="Verdana, Arial, Helvetica, sans-serif">When the server confirms 
+  that the channel is open it can also provide data in response to the channel 
+  open information. It does so by returning this information in the getChannelConfirmationData 
+  method. Again if no data is required to be sent to the remote side simply return 
+  null.</font></p>
+<blockquote>
+  <pre>public byte[] getChannelConfirmationData() {
+  return null;
+}</pre>
+</blockquote>
+<p><font size="2" face="Verdana, Arial, Helvetica, sans-serif">Once the channel 
+  has been opened, the channel mechanism calls the channels onChannelOpen method. 
+  You should not perform any expensive processing in this method since it will 
+  lock up the protocol and you will not be able to send data. </font></p>
+<blockquote>
+  <pre>protected void onChannelOpen() throws java.io.IOException {
+  /** Your channel is open so do stuff if you want **/
+}</pre>
+</blockquote>
+<p><font size="2" face="Verdana, Arial, Helvetica, sans-serif">Once the channel 
+  is open you can send data using the channels sendChannelData method, this type 
+  of data is received by the channel with the following method.</font></p>
+<blockquote>
+  <pre>protected void onChannelData(SshMsgChannelData msg) throws java.io.IOException {
+  // Channel data has arrived, process it!
+}</pre>
+</blockquote>
+<p><font size="2" face="Verdana, Arial, Helvetica, sans-serif">There is also an 
+  extended data channel which can be used, the extended data has a type field 
+  which can be used to identify different application defined data types. This 
+  is received with the onChannelExtData method and sent with sendChannelExtData.</font></p>
+
+  <blockquote>
+  <pre>protected void onChannelExtData(SshMsgChannelExtendedData msg) throws java.io.IOException {<br>  /**@todo Implement this com.sshtools.j2ssh.connection.Channel abstract method*/<br>}
+ </pre>
+</blockquote>
+<p><font size="2" face="Verdana, Arial, Helvetica, sans-serif">There is also a 
+  request mechanism seperate to the channel data which can be used. This provides 
+  named based requests. For example in our echo channel we could have a request 
+  to turn echo on and off. Requests are recieved with the onChannelRequet method 
+  and sent with sendChannelRequest.</font></p>
+<blockquote>
+  <pre>protected void onChannelRequest(String requestname, boolean wantreply, byte[] requestdata) 
+  throws java.io.IOException {
+  /**@todo Implement this com.sshtools.j2ssh.connection.Channel abstract method*/
+}</pre>
+</blockquote>
+<p><font size="2" face="Verdana, Arial, Helvetica, sans-serif">When you no longer 
+  wish to send data you can set the local side to EOF by using setLocalEOF. When 
+  the remote server sends EOF the onChannelEOF method is called.</font></p>
+<blockquote>
+  <pre>protected void onChannelEOF() throws java.io.IOException {
+  /**@todo Implement this com.sshtools.j2ssh.connection.Channel abstract method*/
+}</pre>
+</blockquote>
+<p><font size="2" face="Verdana, Arial, Helvetica, sans-serif">Finally, to close the channel 
+  you can use the close method. When the channel is closed by either side the 
+  onChannelClose method is called.</font></p>
+<blockquote>
+  <pre>protected void onChannelClose() throws java.io.IOException {
+  /**@todo Implement this com.sshtools.j2ssh.connection.Channel abstract method*/
+}</pre>
+</blockquote>
+<!--pagebreak-->
+<p><font size="2" face="Verdana, Arial, Helvetica, sans-serif">Ok so now we know the basic 
+  structure how do we implement our channel and use it from either side of the 
+  connection? Heres our server side channel implelentation. This simply returns 
+  any data sent to it if echo is on.</font></p>
+<blockquote>
+  <pre>public class EchoChannel extends Channel {
+ 
+ boolean echo = true;
+ 
+ public EchoChannel() {
+ 
+ }
+ 
+ public String getChannelType() {
+   return "echo@3sp.com";;
+ }
+ 
+ protected void onChannelRequest(String requestname, boolean wantreply, byte[] 
+                requestdata) throws java.io.IOException {
+    if(requestname.equals("echo-off@3sp.com";)) {
+      echo = false;
+      if(wantreply)
+         connection.sendChannelRequestSuccess(this);
+      return;
+     } else if(requestname.equals("echo-on@3sp.com";)) {
+      echo = true;
+      if(wantreply)
+        connection.sendChannelRequestSuccess(this);
+      return;
+    }
+    
+    if(wantreply)
+      connection.sendChannelRequestFailure(this);
+ }
+
+ protected void onChannelExtData(SshMsgChannelExtendedData msg) throws java.io.IOException {
+ 
+ }
+
+ protected void onChannelData(SshMsgChannelData msg) throws java.io.IOException {
+   if(echo)
+    sendChannelData(msg.getChannelData());
+ }
+
+ protected int getMaximumPacketSize() {
+  return 32768;
+ }
+
+ protected void onChannelEOF() throws java.io.IOException {
+
+ }
+
+ protected void onChannelClose() throws java.io.IOException {
+
+ }
+
+ public byte[] getChannelOpenData() {
+  return null;
+ }
+
+ protected int getMinimumWindowSpace() {
+  return 1024;
+ }
+
+ protected int getMaximumWindowSpace() {
+  return 65535;
+ }
+
+ protected void onChannelOpen() throws java.io.IOException {
+
+ }
+
+ public byte[] getChannelConfirmationData() {
+  return null;
+ }
+}</pre>
+</blockquote>
+<p><font size="2" face="Verdana, Arial, Helvetica, sans-serif">Now we need to 
+  configure the server to accept the channel and create an instance of our EchoChannel 
+  when a request is made. To do this we will need to create a ChannelFactory that 
+  can create the channel, this is a simple interface</font></p>
+<blockquote>
+  <pre>public interface ChannelFactory {
+
+
+  public Channel createChannel(String channelType, byte[] requestData) 
+      throws InvalidChannelException;
+}
+  </pre>
+</blockquote>
+<p><font size="2" face="Verdana, Arial, Helvetica, sans-serif">So lets create an EchoChannelFactory 
+  implementation</font></p>
+<blockquote>
+  <pre>public class EchoChannelFactory implements ChannelFactory {
+  
+   public Channel createChannel(String channelType, byte[] requestData) 
+         throws InvalidChannelException {
+      
+       if(channelType.equals("echo@3sp.com";)) {
+         return new EchoChannel();
+       }
+       
+       throw new InvalidChannelException("Only echo channels allowed by this factory");
+   }
+}</pre>
+</blockquote>
+<p><font size="2" face="Verdana, Arial, Helvetica, sans-serif">So now were ready 
+  to configure the server. In my previous articles you will remember we implemented 
+  the configureServices method of the SshServer? To allow this channel to be opened, 
+  we simply add the following line to the configureServices implementation</font></p>
+<blockquote><pre>connection.addChannelFactory("echo@3sp.com";, new EchoChannelFactory());</pre></blockquote>
+<p><font size="2" face="Verdana, Arial, Helvetica, sans-serif">Your server should now be 
+  configured to support your channel. So lets look at how to invoke the channel 
+  from the client.</font></p>
+<p><font size="2" face="Verdana, Arial, Helvetica, sans-serif">First we need to create 
+  a client side implementation of the channel, but we need it to be simpler with 
+  a set of IOStreams perhaps??? Well the hard work is already done for you, take 
+  a look at the IOChannel class. This provides an InputStream and OutputStream 
+  for the channels data. Heres the implementation, it has less methods to implement 
+  since the channel data is now handled by the parent class.</font></p>
+<blockquote>
+  <pre>public class EchoChannelClient extends IOChannel {
+  
+  public EchoChannelClient() {
+  
+  }
+  
+  public String getChannelType() {
+    return "echo@3sp.com";;
+  }
+
+  protected void onChannelRequest(String requestname, 
+                                   boolean wantreply, 
+								   byte[] data) throws java.io.IOException {
+    if(wantreply)
+      connection.sendChannelRequestFailure(this);
+  }
+  
+  protected int getMaximumPacketSize() {
+   return 32768;
+  }
+  
+  public byte[] getChannelOpenData() {
+    return null;
+  }
+
+  protected int getMinimumWindowSpace() {
+    return 1024;
+  }
+
+  protected void onChannelOpen() throws java.io.IOException {
+  
+  }
+
+  protected int getMaximumWindowSpace() {
+    return 65535;
+  }
+
+  public byte[] getChannelConfirmationData() {
+    return null;
+  }
+}</pre>
+</blockquote>
+<p><font size="2" face="Verdana, Arial, Helvetica, sans-serif">We need to add 
+  a method for turning the echo on and off.</font></p>
+<blockquote>
+  <pre>public void setEcho(boolean echo) throws java.io.IOException {
+  if(echo)
+    connection.sendChannelRequest(this, "echo-on@3sp.com";, false, null);
+  else
+    connection.sendChannelRequest(this, "echo-off@3sp.com";, false, null);
+}</pre>
+</blockquote>
+<p><font size="2" face="Verdana, Arial, Helvetica, sans-serif">Now were ready 
+  to go since any data we write to the channels outputstream, which we obtain 
+  by using getOutputStream will be returned to the InputStream if echo is on.</font></p>
+<p> <font size="2" face="Verdana, Arial, Helvetica, sans-serif">To use the channel using 
+  an SshClient instance simply</font></p>
+<blockquote>
+  <pre>EchoChannelClient echo = new EchoChannelClient();
+  
+if(ssh.openChannel(echo)) {
+  // Channel is open
+  echo.getOutputStream().write("hello world!".getBytes());
+  
+  // Read it back from the inputstream
+  byte[] buf = new byte[32];
+  echo.getInputStream().read(buf);
+}</pre>
+</blockquote>
+<p><font size="2" face="Verdana, Arial, Helvetica, sans-serif"> So of course your 
+  requirements are probably much more complex, if you want the server to handle 
+  IOStreams you can use the IOChannel instead of the Channel, in the end its up 
+  to you....... with a little imagination ;-) </font></p>
+</body>
+</html>

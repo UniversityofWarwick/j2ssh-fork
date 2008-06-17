@@ -1,0 +1,87 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"
+"http://www.w3.org/TR/html4/loose.dtd">
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1">
+<title>Untitled Document</title>
+</head>
+
+<body>
+ <h2><font face="Verdana, Arial, Helvetica, sans-serif"><a name="top"></a>J2SSH - Port Forwarding</font>   </strong></font>
+   </p>
+ </h2>
+<p><font size="2" face="Verdana, Arial, Helvetica, sans-serif">This tutorial explains 
+  how to set up the following types of forwarding using J2SSH:</font></p>
+<p><font size="2" face="Verdana, Arial, Helvetica, sans-serif"><a href="#local">Local 
+  Forwarding</a><br>
+  <a href="#remote">Remote Forwarding</a><br>
+  <em><strong><br>
+  <br>
+  </strong></em> <strong><em>Introduction 
+  to Port Forwarding</em></strong><br>
+  Port forwarding allows you to transparently secure another applications data 
+  stream by intercepting service requests on one side of the SSH connection, and 
+  forwarding them to the recipient at the other side. This is useful in circumstances 
+  where you wish to secure the communications of an inherently insecure network 
+  application, for example Telnet or SMTP. Once the specifics of the port forward 
+  are established through J2SSH, the secured application may commence communication 
+  as normal, completely unaware of the underlying forwarding mechanism.<br>
+  <br>
+  Any TCP/IP traffic occuring on the forwarded port is redirected through the 
+  SSH session - this is particularly advantageous in circumstances where certain 
+  protocols are required to pass through a firewall whose rules restrict their 
+  direct usage</font></p>
+<font size="2" face="Verdana, Arial, Helvetica, sans-serif">For a more thorough backgrounder in SSH port forwarding please see the following link:.<br>
+  http://www.usenix.org/publications/library/proceedings/als2000/full_papers/orr/orr_html/</A>
+  </p>
+</font>
+<p><font size="2" face="Verdana, Arial, Helvetica, sans-serif"> In J2SSH, the 
+  following class allows the configuration of port forwarding:</font>
+<blockquote>
+  <pre>import com.sshtools.j2ssh.forwarding.ForwardingClient; </p>
+</pre>
+</blockquote>
+<p><font size="2" face="Verdana, Arial, Helvetica, sans-serif"><strong><em><a name="local"></a>Local 
+  Forwarding</em></strong><br>
+  Local forwarding is one of the two variations of forwarding used by the SSH 
+  protocol. By setting up local forwarding, you are specifying that requests initiated 
+  from the local machine are to be redirected over the SSH<br>
+  communications channel and delivered to the corresponding port at the other 
+  side of the connection. To initiate a<br>
+  local forward in J2SSH you must do the following after obtaining an authenticated 
+  SSH session:</font></p>
+<blockquote>
+  <pre>ForwardingClient forwarding = ssh.getForwardingClient();<br>  
+// Configure forwarding on local port 10009 to remote port 10007 on mars.sshtools.org
+forwarding.addLocalForwarding("Test Local", "0.0.0.0", 10009, "mars.sshtools.org", 10007)<br>
+// Starts the specified port forward
+forwarding.startLocalForwarding("Test Local");</pre>
+</blockquote>
+<p><font size="2" face="Verdana, Arial, Helvetica, sans-serif"><a href="#top">Back 
+to top</a><br>
+<br>
+<br>
+<em><strong><a name="remote"></a>Remote Forwarding</strong></em><br>
+Remote forwarding is similar to local forwarding except that the forwarded connection 
+is initiated from the remote<br>
+side. This method should be used when the application client requiring secured 
+communications is residing at the remote location (the SSH server side), and the 
+application server is located at the SSH client side. Initiating a remote forward 
+can be done in a similar manner:</font><font size="2"><br>
+</font>
+<blockquote> 
+  <pre><font size="2">ForwardingClient forwarding = ssh.getForwardingClient();<br>
+// Forward remote port 8081 on mars.sshtools.org to local port 8080
+forwarding.addRemoteForwarding("Test Remote", "0.0.0.0", 8081, "mars.sshtools.org", 8080)<br>
+forwarding.startRemoteForwarding("Test Remote");</font></pre>
+</blockquote>
+<p><font size="2" face="Verdana, Arial, Helvetica, sans-serif">Once set up, the 
+example local and remote forwardings may be removed by specifying:<br>
+</font>
+<blockquote>
+  <pre><font size="2">forwarding.removeLocalForwarding("Test Local");
+forwarding.removeRemoteForwarding("Test Remote"); </font></pre>
+</blockquote>
+<p><font size="2" face="Verdana, Arial, Helvetica, sans-serif"><a href="#top">Back to top</a></font></p>
+</body>
+</html>

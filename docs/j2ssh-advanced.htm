@@ -1,0 +1,206 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"
+"http://www.w3.org/TR/html4/loose.dtd">
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1">
+<title>Untitled Document</title>
+</head>
+
+<body>
+<h2><font face="Verdana, Arial, Helvetica, sans-serif"><a name="top"></a>J2SSH - Advanced Connectivity</font></h2>
+<p><a href="#connectionproperties">Connection Properties</a><br>
+    <a href="#profiles">Connection Profiles</a><br>
+    <a href="#monitor">Monitoring the Connection State</a><br>
+    <a href="#serverhostkey">Verifying the Server's Host Key</a></font>
+    </p>
+</p>
+<p><a name="connectionproperties"></a><font size="2" face="Verdana, Arial, Helvetica, sans-serif"><strong><em>Connection 
+  Properties</em></strong></font></p>
+<p><font size="2" face="Verdana, Arial, Helvetica, sans-serif">Each SSH connection 
+  has a number of components, they include encryption ciphers, message authentication 
+  algorithms and compression settings. The SSH protocol states that these components 
+  must run independently of each other in both directions on the connection. The 
+  following class makes it possible to configure these settings:</font> 
+<blockquote><pre>import com.sshtools.j2ssh.configuration.SshConnectionProperties</pre></blockquote>
+<p><font size="2" face="Verdana, Arial, Helvetica, sans-serif">When using the 
+  SshClient connect method, it is possible to pass an SshConnectionProperties 
+  instance instead of<br>
+  a hostname.</font></p>
+<blockquote>
+  <pre>SshConnectionProperties properties = new SshConnectionProperties();<br>  
+properties.setHost("firestar");
+properties.setPort(22);<br>  
+ssh.connect(properties);</pre>
+</blockquote>
+<p><font face="Verdana, Arial, Helvetica, sans-serif"><font size="2">There are 
+  additional methods to set the preferred ciphers:</font></font></p>
+<blockquote>
+  <pre>// Sets the preferred client->server encryption cipher
+properties.setPrefCSEncryption("blowfish-cbc");<br>  
+// Sets the preferred server->client encryption cipher
+properties.setPrefSCEncryption("3des-cbc");</pre>
+</blockquote>
+<p><font size="2" face="Verdana, Arial, Helvetica, sans-serif">The parameter passed 
+  should be the name of the SSH cipher that you require, this can be any installed 
+  cipher, the following are currently supported.</font></p> </p>
+<blockquote>
+  <p><font size="2" face="Verdana, Arial, Helvetica, sans-serif">• 3des-cbc<br>
+    • blowfish-cbc<br>
+    • twofish256-cbc*<br>
+    • twofish196-cbc*<br>
+    • twofish128-cbc*<br>
+    • aes256-cbc*<br>
+    • aes196-cbc*<br>
+    • aes128-cbc*<br>
+    • cast128-cbc*</font></blockquote>
+<p><font size="2" face="Verdana, Arial, Helvetica, sans-serif"> * Installed as 
+  part of the Bouncy Castle cipher extensions package<br>
+  </font><font size="2" face="Verdana, Arial, Helvetica, sans-serif"><br>
+  In the same way you can set the message authentication algorithms for each direction 
+  of the connection:</font> 
+<blockquote>
+  <pre><font size="2">//Sets the preferred client->server message authenticaiton
+properties.setPrefCSMac("hmac-sha1");<br>
+// Sets the preferred server->client message authentication
+properties.setPrefSCMac("hmac-md5");</font></pre>
+</blockquote>
+<p><font size="2" face="Verdana, Arial, Helvetica, sans-serif"> The following 
+  message authentication algorithms are currently supported:</font></p> </p>
+<blockquote>
+  <p><font size="2" face="Verdana, Arial, Helvetica, sans-serif">• hmac-sha1<br>
+    • hmac-sha1-96<br>
+    • hmac-md5<br>
+    • hmac-md5-96</font></blockquote>
+<p><font size="2" face="Verdana, Arial, Helvetica, sans-serif"> </font><font size="2" face="Verdana, Arial, Helvetica, sans-serif">You 
+  can set the preferred server host key for server authentication using:</font> 
+<blockquote> 
+  <pre><font size="2">// Set the preferred server host key
+properties.setPrefPublicKey("ssh-rsa");</font></pre>
+</blockquote>
+<p><font size="2" face="Verdana, Arial, Helvetica, sans-serif">The following public-key 
+  algorithms are supported:</font></p>
+<blockquote>
+  <p><font size="2" face="Verdana, Arial, Helvetica, sans-serif"> • ssh-dss 
+    DSA public keys<br>
+    • ssh-rsa RSA public keys</font></p>
+</blockquote>
+<p><font size="2" face="Verdana, Arial, Helvetica, sans-serif"><a href="#top">Back 
+  to top</a></font></p>
+<p><font size="2" face="Verdana, Arial, Helvetica, sans-serif"><strong><em><br>
+
+<a name="profiles"></a> Connection Profiles</em></strong><br>
+J2SSH includes a connection profile class that is more useful for more advanced 
+purposes such as graphical<br>
+  front-ends and automating authentication procedures.</font> 
+<blockquote>
+  <pre><font size="2">import com.sshtools.j2ssh.util.SshtoolsConnectionProfile;</font></pre>
+</blockquote>
+<p><font size="2" face="Verdana, Arial, Helvetica, sans-serif">This class can 
+  output to XML and so provides a mechanism for storing connection details. It 
+  has a number of<br>
+  useful methods that allow application level settings to be stored alongside 
+  the existing SSH connection properties.<br>
+  <br>
+  </font><font size="2" face="Verdana, Arial, Helvetica, sans-serif"><a href="#top">Back 
+  to top</a><br>
+  <em><strong><br>
+  <a name="monitor"></a>Monitoring the Connection State</strong></em><br>
+  It is possible to monitor the connection state in order to determine whether 
+  a session is active, or disconnected.<br>
+  A number of other connection states may also be tested for.<br>
+  </font> </p>
+<blockquote>
+  <pre><font size="2">import com.sshtools.j2ssh.transport.TransportProtocolState;
+import com.sshtools.j2ssh.SshClient;<br>
+...<br>
+SshClient ssh = new SshClient();
+...<br>
+TransportProtocolState state = ssh.getConnectionState();<br>
+if (state.getValue()==TransportProtocolState.DISCONNECTED) {
+  System.out.println("Transport protocol has disconnected!");
+}</font></pre>
+</blockquote>
+<p><font size="2" face="Verdana, Arial, Helvetica, sans-serif"> </font><font size="2" face="Verdana, Arial, Helvetica, sans-serif">The 
+  following states are available, you will be mostly concerned with the connected 
+  and disconnected states, but<br>
+  it is possible for the protocol to not have a CONNECTED state but still be connected. 
+  When trying to determine<br>
+  the current connection state it should always be evaluated against the DISCONNECTED 
+  state.</font> </p>
+<blockquote>
+  <pre><font size="2">/**
+* the transport protocol is uninitialized
+*/
+public final static int UNINITIALIZED = 1;<br>
+/**
+* the transport protocol is connected and negotiating the protocol version
+*/
+public final static int NEGOTIATING_PROTOCOL = 2;<br>
+/**
+* the transport protocol is performing key exchange
+*/
+public final static int PERFORMING_KEYEXCHANGE = 3;<br>
+/**
+* the transport protocol is connected
+*/
+public final static int CONNECTED = 4;<br>
+/**
+* the transport protocol is disconnected
+*/
+public final static int DISCONNECTED = 5;</font></pre>
+</blockquote>
+<p><font size="2" face="Verdana, Arial, Helvetica, sans-serif"> It is possible 
+  to wait for a specific state, there are a number of methods available that will 
+  cause the current thread to wait until the required state has been reached.</font> 
+</p>
+<blockquote>
+  <pre>// To wait for a specific state
+state.waitForState(TransportProtocolState.DISCONNECTED);</font></font></p>
+
+// To wait for a state update<br>state.waitForStateUpdate();</pre>
+</blockquote> </font><font size="2" face="Verdana, Arial, Helvetica, sans-serif"><a href="#top">Back 
+  to top</a><br>
+  </font></p>
+<p><font size="2" face="Verdana, Arial, Helvetica, sans-serif"><strong><em><a name="serverhostkey"></a>Verifying 
+  the Server Host Key</em></strong><br>
+  <br>
+  When the client connects to the server, the server supplies its public key for 
+  the client to verify. You will have already seen that calling <em>SshClient.connect</em> 
+  prompts the user within the console to verify the key:</font> </p>
+<blockquote>
+  <pre>The host firestar is currently unknown to the system<br>The host key fingerprint is: 1028: 69 54 9c 49 e5 92 59 40 5 66 c5 2e 9d 86 af ed<br>
+Do you want to allow this host key? [Yes|No|Always]:</pre>
+</blockquote>
+<p><font size="2" face="Verdana, Arial, Helvetica, sans-serif"> In the default 
+  implementation J2SSH reads the $HOME/.ssh/known_hosts file to determine which 
+  hosts connections may be allowed or denied. This is provided by the class <em>ConsoleKnownHostsKeyVerification</em> 
+  and the default behaviour can be emulated by the following code:</font></p>
+<blockquote>
+  <pre>import com.sshtools.j2ssh.transport.ConsoleKnownHostsKeyVerification;
+...
+SshClient ssh = new SshClient();
+ssh.connect("firestar", new ConsoleKnownHostsKeyVerification());</pre>
+</blockquote>
+<p> <font size="2" face="Verdana, Arial, Helvetica, sans-serif">The <em>ConsoleKnownHostsKeyVerification</em> 
+  class provides a simple console request mechanism to allow for host key verification. 
+  An addtional mechanism is available for swing applications which is implemented 
+  by the <em>DialogKnownHostsKeyVerfication</em> class. This prompts the user 
+  using a standard JOptionPane dialog:</font></p>
+<blockquote><pre>import com.sshtools.j2ssh.transport.DialogKnownHostsKeyVerification;</pre>
+</blockquote>
+<p><font size="2" face="Verdana, Arial, Helvetica, sans-serif"> If you prefer 
+  to ignore the host key verification process you can use the following class:</font></p>
+<blockquote>
+  <pre>import com.sshtools.j2ssh.transport.IgnoreHostKeyVerification</pre>
+</blockquote>
+<p><font size="2" face="Verdana, Arial, Helvetica, sans-serif"> To override the 
+  default behaviour with your own mechanism, there are two choices. First you 
+  can extend the <em>AbstractKnownHostsKeyVerification</em> class. This provides 
+  persistence to <em>known_hosts</em> and is recommended for users with additonal 
+  implementations where these default styles are not appropriate. For a more simple 
+  method with no persistence you can implement the base interface for host verification.</font></p> 
+  </font></p>
+<p><font size="2" face="Verdana, Arial, Helvetica, sans-serif"><a href="#top">Back 
+  to top</a></font></p>
+</body>
+</html>

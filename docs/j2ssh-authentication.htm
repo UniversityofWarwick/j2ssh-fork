@@ -1,0 +1,198 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"
+"http://www.w3.org/TR/html4/loose.dtd">
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1">
+<title>Untitled Document</title>
+</head>
+
+<body>
+<h2><strong><font face="Verdana, Arial, Helvetica, sans-serif"><a name="top"></a>J2SSH - Alternative Authentication 
+Methods</font></strong>  </h2>
+<p><font face="Verdana, Arial, Helvetica, sans-serif"><br>
+    <font size="2">J2SSH provides a number of more advanced authentication methods 
+  than the standard password authentication. This tutorial covers the following 
+  authentication methods:</font>
+  </p>
+    </font></font></p>
+<p><font size="2" face="Verdana, Arial, Helvetica, sans-serif"><a href="#Publickey">Public-key 
+  Authentication</a><br>
+  <a href="#keyboard">Keyboard-interactive Authentication</a><br>
+  <a href="#Hostbased">Hostbased Authentication</a></font></p>
+<p><font size="2" face="Verdana, Arial, Helvetica, sans-serif">This tutorial also 
+  covers the following related issues:<br>
+  </font><font size="2" face="Verdana, Arial, Helvetica, sans-serif"><br>
+  <a href="#banner">Getting the banner message from the server</a></font></p>
+<p><em><strong><font size="2" face="Verdana, Arial, Helvetica, sans-serif"><a name="Publickey"></a>Public-key 
+  Authentication </font></strong></em></p>
+<p><font size="2" face="Verdana, Arial, Helvetica, sans-serif">This method of authentication 
+  uses public-key cryptography to verify the user's identity. The user can access 
+  an account on an SSH server by proving that they possess a private key. The 
+  key is authorized if it is contained within the user's authorization file.<br>
+  <br>
+  J2SSH implements the 'public-key' authentication method with the following class:</font>
+<blockquote><pre>import com.sshtools.j2ssh.authentication.PublicKeyAuthenticationClient;</pre></blockquote>
+<p> <font size="2" face="Verdana, Arial, Helvetica, sans-serif">Public-key authentication 
+  requires a little more configuration. First you will require a key pair which 
+  can be generated using the ssh-keygen tool, located in the bin directory of 
+  the J2SSH installation.</font></p>
+<blockquote>
+  <pre>C:\sshtools-j2ssh\bin>ssh-keygen -b 1024 -t dsa mykey </pre>
+</blockquote>
+<p><font size="2" face="Verdana, Arial, Helvetica, sans-serif">This command creates 
+  a 1024 bit DSA key pair and saves the private key as mykey and the public key 
+  as mykey.pub. Enter the private key passphrase when prompted or simply press 
+  return if you don't want the file encrypted with a passphrase. You will be prompted 
+  to confirm again that you don't want any passphrase protecting the private key 
+  file.<br>
+  <br>
+  The ssh-keygen tool outputs the public key file in the IETF-SECSH Public Key 
+  file format. This is suitable for most SSH servers, however you may need to 
+  convert the file if you are using OpenSSH. You can convert the file using the 
+  following command:</font>
+<blockquote> 
+<pre>C:\sshtools-j2ssh\bin>ssh-keygen -e mykey.pub > mykey.open</pre>
+</blockquote>
+
+  
+<p><font size="2" face="Verdana, Arial, Helvetica, sans-serif">This command converts 
+  the public key file mykey.pub into a new file mykey.open. Similary, it is possible 
+  to convert an OpenSSH file into an IETF-SECSH file using the -e switch. To use 
+  this key to gain access to your SSH server, you must configure the server to 
+  allow access using the key. Refer to your server documentation on how to configure 
+  your specific server, however this normally involves the configuration of an 
+  authorization file; either stored in the server installation directory or alternatively 
+  in your $USER_HOME/.ssh directory. The following is a typical example of an 
+  authorization file: </font>
+<blockquote><pre>#SSH Authorization file<br>key mykey.pub</pre>
+</blockquote>
+  
+<p><font size="2" face="Verdana, Arial, Helvetica, sans-serif">Once your server 
+  is configured you can connect using your newly generated key with the following 
+  code:</font>
+<blockquote>
+  <pre>import com.sshtools.j2ssh.transport.publickey.SshPrivateKey;
+import com.sshtools.j2ssh.transport.publickey.SshPrivateKeyFile;
+import com.sshtools.j2ssh.transport.publickey.SshtoolsPrivateKeyFormat;
+import com.sshtools.j2ssh.transport.publickey.SshPrivateKey;<br>
+..
+..<br>  
+/**
+* Authenticate using a public key
+*/<br>
+PublicKeyAuthenticationClient pk = new PublicKeyAuthenticationClient();<br>
+// Get the username
+System.out.print("Username: ");
+String username = reader.readLine();
+pk.setUsername(username);<br>
+// Open up the private key file
+System.out.print("Path to key: ");
+String keyfile = reader.readLine();
+SshPrivateKeyFile file = SshPrivateKeyFile.parse(new File(keyfile));<br>
+// Get the key
+System.out.print("Enter passphrase: ");
+String passphrase = reader.readLine();
+SshPrivateKey key = file.toPrivateKey(passphrase);<br>
+// Set the key and authenticate
+pk.setKey(key);
+int result = ssh.authenticate(pk);</pre>
+</blockquote>
+<p><font size="2" face="Verdana, Arial, Helvetica, sans-serif">For an empty passphrase 
+  simply provide a zero length string or null. You can also determine whether 
+  a private key file is encrypted by calling the following method on the SshPrivateKeyFile 
+  instance.</font>
+<blockquote><pre>public boolean isPassphraseProtected();</pre></blockquote>
+<p><font size="2" face="Verdana, Arial, Helvetica, sans-serif"><a href="#top">Back 
+  to top</a></font></p>
+<pre><font size="2" face="Verdana, Arial, Helvetica, sans-serif"><strong><em><a name="Keyboard"></a>Keyboard-interactive Authentication</em></strong></font></pre>
+<p><font size="2" face="Verdana, Arial, Helvetica, sans-serif"> The 'keyboard-interactive' 
+method is a general purpose authentication mechanism for the SSH protocol, suitable 
+for interactive authentications where the authentication data should be entered 
+via a keyboard. The goal of this method is to allow an SSH client to support a 
+whole class of authentication mechanisms without knowing the specifics of the 
+actual authentication implemenation. The most common use for this method is to 
+provide password authentication and so this section will assume that the server 
+provides password authentication over keyboard-interactive.<br>
+<br>
+J2SSH implements the keyboard-interactive authentication method with the following 
+class:<br>
+</font> 
+<blockquote>
+  <pre><font size="2">import com.sshtools.j2ssh.authentication.KBIAuthenticationClient;</font></pre>
+</blockquote>
+<p><font size="2" face="Verdana, Arial, Helvetica, sans-serif">This method works 
+  by providing a callback interface to the authentication subsystem so that the 
+  server can request information from the user. Any number of prompts are returned 
+  with the name of the authentication mechanism and instructions to display to 
+  the user.</font></p>
+<blockquote><pre>import com.sshtools.j2ssh.authentication.KBIAuthenticationClient;
+import com.sshtools.j2ssh.authentication.KBIPrompt;
+import com.sshtools.j2ssh.authentication.KBIRequestHandler;
+..
+..
+/**
+* Create the keyboard-interactive instance
+*/
+KBIAuthenticationClient kbi = new KBIAuthenticationClient();
+   
+// Set the callback interface
+kbi.setKBIRequestHandler(new KBIRequestHandler() {
+  public void showPrompts(String name, String instructions, KBIPrompt[] prompts)    {
+    // Print out the name and instructions
+    System.out.println(name);
+    System.out.println(instructions);
+   
+    // Iterate through the prompts showing one at a time
+    String response;
+    if(prompts!=null) {
+      for(int i=0;i<prompts.length;i++) {
+        System.out.print(prompts[i].getPrompt() + ": ");
+        try {
+          response = reader.readLine();
+          prompts[i].setResponse(response);
+        }
+        catch (IOException ex) {
+          ex.printStackTrace();
+        }
+      }
+    }
+   // Completed entering the prompts
+  }
+});
+int result = ssh.authenticate(kbi);</pre></blockquote>
+
+<font size="2" face="Verdana, Arial, Helvetica, sans-serif"><a href="#top">Back 
+to top</a></font>
+<p><font size="2" face="Verdana, Arial, Helvetica, sans-serif"><strong><em><a name="Hostbased"></a>Hostbased 
+  Authentication</em></strong></font><br>
+  <font size="2" face="Verdana, Arial, Helvetica, sans-serif">The hostbased authentication 
+  method provides a quick but much less secure method of authenticating on the 
+  remote server. An SSH server can be configured to allow a client to authenticate 
+  based on the host key of the client computer. Whilst this configuraiton varies 
+  according to server implementation, J2SSH implements a simple authentication 
+  mechanism for hostbased access, the following code shows how to authenticate 
+  using this method.</font>
+<blockquote>
+  <pre>import com.sshtools.j2ssh.authentication.HostbasedAuthenticationClient;<br>HostbasedAuthenticationClient hb = new HostbasedAuthenticationClient();<br>
+// Get the username<br>System.out.print("Username: ");<br>
+String username = reader.readLine();</p>
+hb.setUsername(username);<br>
+SshPrivateKeyFile file = SshPrivateKeyFile.parse(<br>  new File("/etc/ssh/server_host_key"));<br>
+// Load the host key without a passphrase<br>hb.setKey(file.toPrivateKey(null));<br>int result - ss.authenticate(hb);</pre>
+</blockquote>
+<p><font size="2" face="Verdana, Arial, Helvetica, sans-serif"><a href="#top">Back 
+  to top</a></font></p>
+<p><font size="2" face="Verdana, Arial, Helvetica, sans-serif"><strong><em><a name="banner"></a>The 
+Authentication Banner Message</em></strong><br>
+After the initial connection has been made, the server may send an authentication 
+banner message which should be shown to the user prior to authentication. Use 
+the getAuthenticationBanner() method to retrieve the banner message. If no message 
+has been received this method returns an empty string.<br>
+</font>
+<blockquote>
+  <pre><font size="2">public String getAuthenticationBanner();</font></pre>
+</blockquote>
+<p><font size="2" face="Verdana, Arial, Helvetica, sans-serif"><a href="#top">Back 
+  to top</a></font></p>
+</body>
+</html>

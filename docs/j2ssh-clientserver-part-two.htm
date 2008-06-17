@@ -1,0 +1,352 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"
+"http://www.w3.org/TR/html4/loose.dtd">
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1">
+<title>Untitled Document</title>
+</head>
+
+<body>
+<h2><font face="Verdana, Arial, Helvetica, sans-serif">Part Two - Building an SSH server to 
+  provide your applications services. </font>
+    <font face="Verdana, Arial, Helvetica, sans-serif"> 
+  </font></h2>
+<font face="Verdana, Arial, Helvetica, sans-serif">
+<p><font size="2">In the previous part of this article I showed you how to secure 
+  your client-application server by using J2SSH to create an embeded tunnel to 
+  an SSH server installed on the same host as your server. Whilst the tunnel is 
+  secure it does not provide access to the strong public key authentication that 
+  SSH provides. In this article we take no prisoners, were going to implement 
+  an SSH server and transfer your existing application server functionality into 
+  the SSH server itself so that your application can take advantage of public 
+  key authentication and other SSH services such as SFTP. </font></p>
+<p><font size="2"><em><strong>Starting the basic framework server</strong></em><br>
+</font><font size="2">First things first, even before you think about how to get your 
+      existing application functionality into the SSH server, you need to get the 
+      server itself running and accepting each connection and authenticating the user. 
+Make sure you have the source version of J2SSH since we're going copy the <code>com.sshtools.daemon.SshDaemon</code> source code to create your server. </font></p>
+<p><font size="2">If you examine this class you will see that 
+        it has a main method and so we're going to use this class to configure, start 
+        and stop your server.Lets not worry about what the SshDaemon is doing right now, 
+        lets just make sure we can start and stop the server. You may have noticed that 
+        the main method allows a couple of command line arguments -start and -stop. 
+        No guessing for what these do! Before we start the server there are a couple 
+        of configuration items we need to attend to. First of all the server needs a 
+  public key to identify itself to clients. </font><font size="2">Generate a key pair using the J2SSH 
+  command line utility ssh-keygen.</font></p>
+<p><code>¢ ssh-keygen.bat -t dsa -b 1024 server_host_key</code></p>
+<p><font size="2">When prompted to enter a passprase simply press return and confirm 
+          that you do not want to encrypt the private key, server host keys cannot be 
+    encrypted since there is no where to store the passphrase! </font></p>
+<p><font size="2">Copy the host key into the J2SSH conf directory, whilst you're 
+            in there open up the server configuration file <em>server.xml</em> and I'll take you 
+            over some of the other options. Make sure that there is a <ServerHostKey> element whose PrivateKeyFile attribute is pointing to the private key file you 
+    have just generated. </font><code><ServerHostKey PrivateKeyFile="server_host_key"/></code></p>
+<p> <font class="pn-normal"><font face="Verdana, Arial, Helvetica, sans-serif"><code>&lt;ServerHostKey PrivateKeyFile="server_host_key"/&gt;</code></font></font> </p>
+<p><font size="2">Next make sure that the <code><Port></code> element is 
+                set to the port you wish your server to bind, if you have another SSH server 
+          running you might want to change this to a non standard port for now.</font></p>
+<p><font size="2">Finally the <code><CommandPort></code>    <font class="pn-normal"><font face="Verdana, Arial, Helvetica, sans-serif"><font size="2"><code>&lt;CommandPort&gt;</code></font></font></font> element is the 
+                  local port which the server listens for commands, there is only one command 
+            currently implemented and that is stop. </font></p>
+<p><font size="2">You should now be able to start the server by executing the 
+  SshDaemon class, you will need to set the sshtools.home System property to point 
+  to the root installation directory of J2SSH. This will be used to find the XMl 
+  configuration files. Once you have the server running (remember to pass in the 
+  -start option on the command line) it should accept connections, but if you 
+  connect and try to authenticate it will fail because there is no authentication 
+  provider installed. So that's our next step.</font></p>
+</font>
+<!--pagebreak-->
+<font face="Verdana, Arial, Helvetica, sans-serif"> 
+<strong><font size="2"><em>Creating an authentication provider</em></font></p> 
+</strong> 
+<p><font size="2">The authentication provider allows you to define how users are 
+  authenticated when they connect to the SSH server. Your application may already 
+  have a mechanism for this, perhaps by searching a database table, or an encrypted 
+  password file. In any case you will want to transfer this process to the authentication 
+  provider, since I cannot help you on that front, I will show you how to implement 
+  a basic mechanism and explain the methods you are required to provide. To get 
+  things moving perhaps you should just implement this with me to see how the 
+  process fits together.</font></p>
+<p><font size="2">The abstract <code>NativeAuthenticationProvider</code> is where 
+  we start, we are going to extend this class to implement an authentication provider 
+  that examines the user name and logs them into the system. For simplicity we 
+  will hard code this in this example.</font></p>
+<blockquote><pre>
+class MyAuthenticationProvider extends NativeAuthenticationProvider {
+  
+}
+</pre></blockquote>
+<p><font size="2">Now lets look at the methods we need to implement, first there 
+  is <code>getHomeDirectory</code>. This should return the home directory of the 
+  user whose username is passed as a parameter into the method. This will be used 
+  for public key configuration and also servers as the default directory for the 
+  SFTP server that the framework will provide.</font></p>
+<blockquote><pre>
+public String getHomeDirectory(String username) 
+  								throws IOException {
+  return "/home/users/martianx";
+}
+</pre></blockquote>
+<p><font size="2">There are two <code>logonUser</code> methods that we need to 
+  implement next, the first provides a username and password which should be checked. 
+  If the account exists and the password is correct you should perform any processing 
+  that would log the user into the system and return true to indicate that the 
+  logon was a success. Optionally you can throw a password change exception if 
+  the users password has expired (more about that later).</font></p>
+<blockquote>
+  <pre>
+public boolean logonUser(String username, 
+                         String password) 
+     throws PasswordChangeException, 
+				     	 IOException { 
+   
+   return username.equals("martianx") 
+            && password.equals("foo")); 
+
+  }</pre>
+</blockquote>
+<p><font size="2">The second <code>logonUser</code> method only provides the username. 
+  This is called when a user log's into the system using public key authentication. 
+  When the method is called the server has already verified the identity of the 
+  user through their public key so you should automatically log the user in without 
+  restriction.</font></p>
+<BLOCKQUOTE><pre>
+public boolean logonUser(String username) throws IOException { 
+  
+  return true; // This is for public key authentication and will only 
+               // be called once a key has been verified
+			   
+} </pre></BLOCKQUOTE>
+<p><font size="2">The <code>logoff</code> User method simply should log the user 
+  out of the system, performing any necersary processing that your application 
+  server requires. In our example we will do nothing</font></p>
+<BLOCKQUOTE><pre>
+public void logoffUser() throws IOException { 
+  // do nothing yet 
+}
+</pre></BLOCKQUOTE>
+<p><font size="2">Finally the <code>changePassword</code> method is called if 
+  you had previously had thrown a <code>PasswordChangeException</code> from the 
+  <code>logonUser</code> method. This method should change the password and return 
+  its success (or failure). Our example will return false since we do not support 
+  password change yet.</font></p>
+<BLOCKQUOTE>
+  <pre>
+public boolean changePassword(String username, 
+                              String oldpassword,
+                              String newpassword) { 
+   return false;   // We dont support this yet
+} 
+</pre>
+</BLOCKQUOTE>
+<p><font size="2">So that's the authentication provider implemented, you should 
+  have a good idea about how to go about integrating your servers authentication 
+  mechanism now? But first we need to have a look at this provider in action, 
+  so the next step is to configure the server to load the provider at startup.</font></p>
+<p><font size="2"><em>The platform configuration file</em></font></p>
+<p><font size="2">The providers are configured in a platform configuration file. 
+  The actual name of the file should be set to your application's name, but an 
+  example is provided in the J2SSH distribution and its called <code>platform.xml</code>. 
+  Lets copy the file and create <code>myplatform.xml </code>and configure it for 
+  our new authentication provider.</font></p>
+<p><font size="2">In the file locate the <code><NativeAuthenticationProvider></code> 
+  element and enter the FQN of the authentication implementation we just created.</font></p>
+<blockquote><code><NativeAuthenticationProvider> <font class="pn-normal"><font face="Verdana, Arial, Helvetica, sans-serif"><code>&lt;NativeAuthenticationProvider&gt;com.myplatform.MyAuthenticationProvider&lt;/NativeAuthenticationProvider&gt;</code></font></font> </NativeAuthenticationProvider></code></blockquote>
+<p><font size="2">Save the file and before we start the server we need to make 
+  sure that the server will load the provider by setting a VM parameter, use</font></p>
+<blockquote><code>-Dsshtools.platform=myplatform.xml</code></blockquote>
+<p><font size="2"> Now start the server and try to connect using a standard SSH 
+  client and the authentication information we set in our example. The connection 
+  will still fail but you should get prompted for autehntication information and 
+  see an error message, for example using Putty as a client will probably show 
+  a pty refused message. This is actually a success since the pty is only requested 
+  once authentication has succeeded.</font></p>
+<p><font size="2">The next step is to remove this error message and were going 
+  to acheive that by creating a <code>NativeProcessProvider</code>.</font></p>
+</font>
+<!--pagebreak-->
+<font face="Verdana, Arial, Helvetica, sans-serif"> 
+<p><font size="2"><em><strong>Creating a NavtiveProcessProvider</strong></em></font></p>
+<p><font size="2">The NativeProcessProvider allows the server to provide shell 
+  access and other session based services such as command execution. But you don't 
+  want a terminal I hear you say? Well that's fine but since your using the SSH 
+  framework your going to have to provide one, and you never know what you might 
+  be able to do in the future with a little imagination. For example one of the 
+  things I like to do is to provide terminal access to user accounts for self 
+  serve account maintenance, allowing them to login using a standard SSH client 
+  and change their password account details. It's always a good idea to allow 
+  some form of access into your application server that any standard client can 
+  access. What if your out of the office and really need to log in to change something, 
+  but don't have your laptop, connect using the SSHTerm applet and your connected 
+  again!</font></p>
+<p><font size="2">So what we are going to implement today is a basic terminal 
+  that outputs the message "This server does not provide shell access" 
+  and then disconnects. Let's start by declaring our class which extends <code>NativeProcessProvider</code></font></p>
+<blockquote><pre> 
+public class UnsupportedShellProcess extends NativeProcessProvider {
+  private static String message = "This server does not provide shell access";
+}</pre> </blockquote>
+<p><font size="2">An instance of this class will be created for each session that 
+  is created, the process is required to provide the standard set of IO streams 
+  stdin, stdout and stderr. We will simply use a dynamic buffer class that J2SSH 
+  (which is similar to Piped streams) that will allow us to output something from 
+  the other end of the stream which will be read by the connected client. </font></p>
+<blockquote> 
+  <pre> 
+import com.sshtools.j2ssh.io.DynamicBuffer;
+
+
+DynamicBuffer stdin = new DynamicBuffer();
+DynamicBuffer stderr = new DynamicBuffer();
+DynamicBuffer stdout = new DynamicBuffer();
+  
+public InputStream getInputStream() throws IOException { 
+  return stdin.getInputStream();
+} 
+
+public OutputStream getOutputStream() throws IOException { 
+  return stdout.getOutputStream();
+}
+
+public InputStream getStderrInputStream() { 
+  return stderr.getInputStream();
+}
+</pre>
+</blockquote>
+<p><font size="2">When a command or shell is executed, the framework first requests 
+  that your provider create the process by calling the <code>createProcess</code> 
+  method, this method should initialize your provider with command and environment 
+  provided BUT NOT start the command. The framework will then start it sepeartley 
+  with a call to <code>start</code>. Since were writing a basic implementation 
+  we dont need to setup the process so were ust going to return true to indicate 
+  that the command is reading to start.</font></p>
+<blockquote>
+  <pre>
+public boolean createProcess(String command, 
+                             Map environment) 
+								throws IOException {
+
+  // Of course this could be used to provide a wealth of features
+  // according to the executed command and the environment
+  return true;
+
+}</pre>
+</blockquote>
+<p><font size="2"> Now when the process is started we output our message</font></p>
+<blockquote><pre>
+public void start() throws IOException {
+  stdin.getOutputStream().write(message.getBytes());
+}
+</pre></blockquote>
+<p><font size="2" face="Verdana, Arial, Helvetica, sans-serif">Next the process 
+  is required to provide a default terminal provider, this is used in place of 
+  a command when the user requests to start a shell and so will be the command 
+  argument when <code>createProcess</code> is called, were not going to read this 
+  so just supply any string.</font></p>
+
+<blockquote><pre>
+public String getDefaultTerminalProvider() {
+  return "UnsupportShell";
+}
+</pre></blockquote>
+
+<p><font size="2">The client may request a pseudo terminal, again this is for 
+  a more advanced implementation than we need so in order to make sure that no 
+  client bombs out because we don't allocate one, we implement these methods to 
+  show we support and have allocated a terminal.</font></p>
+<blockquote><pre>
+public boolean supportsPseudoTerminal(String term) {
+    return true;
+}
+</pre></blockquote>
+<blockquote>
+  <pre>
+public boolean allocatePseudoTerminal(String term, 
+                                      int cols,
+                                      int rows, 
+                                      int width, 
+                                      int height, 
+                                      String modes) {
+  return true;
+}</pre>
+</blockquote>
+<p><font size="2"><br>
+  The kill method should end the process, we will simply close all the buffers</font></p>
+<blockquote>
+  <pre>public void kill() {
+  try {
+    stdin.close();
+  }
+  catch (IOException ex) {
+  }
+  try {
+    stdout.close();
+  }
+  catch (Exception ex1) {
+  }
+  try {
+    stderr.close();
+  }
+  catch (Exception ex2) {
+  }
+}
+  </pre>
+</blockquote>
+<p><font size="2">We need to provide the server with an evaluation on the process 
+  to determine whether its still active. We will return active whilst the whole 
+  message has not been read</font></p>
+<blockquote>
+  <pre>public boolean stillActive() {
+   try {
+    return stdin.getInputStream().available() > 0;
+   }
+   catch (IOException ex) {
+    return false;
+   }
+}
+</pre>
+</blockquote>
+<p><font size="2">Finally this method should wait for the process to complete 
+  and then return the exit code. We are already planning on deprecating this method 
+  to provide a callback method but since its still here we need to implemenet 
+  it even if it is rather a crude implementation. We will simple wait for the 
+  message to be read and then return.</font></p>
+<blockquote>
+  <pre>public int waitForExitCode() {
+  try {
+    while (stdin.getInputStream().available() > 0) {
+      try {
+        Thread.sleep(1000); // Crude but necersary
+      }
+      catch (InterruptedException ex) {
+
+      }
+    }
+  }
+  catch (IOException ex1) {
+  
+  }
+  
+  return 0;
+}
+  </pre>
+</blockquote>
+<p><font size="2">As you can see quite an easy implementation, when a connection 
+  is made that requests a shell or to execute a command the command will simply 
+  write out the message and once the message has been read the process will close.</font></p>
+<p><font size="2">To configure this in the platform configuration file you should 
+  set the <NativeProcessProvider> element to point to your class implementation. 
+  If you run your server now and connect, you should no longer see the pty error 
+  message but instead should see the following text followed by a disconnect.</font></p>
+<blockquote><code>"This server does not provide shell access"</code></blockquote>
+</font>
+<font size="2" face="Verdana, Arial, Helvetica, sans-serif">Now you should have 
+a working SSH server which also provides SFTP access to your users. In the final 
+part of this article I will show you how to implement an SSH channel and configure 
+your client and server so that they directly talk to each other through SSH.<br>
+</font> 
+</font>
+</body>
+</html>

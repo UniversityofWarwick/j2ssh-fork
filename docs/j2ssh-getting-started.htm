@@ -1,0 +1,376 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"
+"http://www.w3.org/TR/html4/loose.dtd">
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1">
+<title>Untitled Document</title>
+</head>
+
+<body>
+<h2><font face="Verdana, Arial, Helvetica, sans-serif">Getting started with J2SSH</font> 
+</h2>
+<p> <font size="2" face="Verdana, Arial, Helvetica, sans-serif">The first thing 
+  you will probably want to do is to connect to an SSH server using J2SSH. This 
+  is a fairly<br>
+  straightforward procedure using the SshClient class. This class provides access 
+  for connecting, authenticating<br>
+  and starting a session channel, which enables you to execute commands or start 
+  the users shell.</font></p>
+<p><code> import com.sshtools.j2ssh.SshClient;
+  </code></p>
+<p><font size="2" face="Verdana, Arial, Helvetica, sans-serif">First of all prepare 
+  your application, in this section we will guide you through the basics so for 
+  now just a simple<br>
+  try/catch inside the static main method.</font></p>
+<blockquote>
+  <pre>
+import java.io.BufferedReader;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.io.OutputStream;
+
+
+
+public class SshExample() {
+  // A buffered reader so we can request information from the user
+  private static BufferedReader reader =
+        new BufferedReader(new InputStreamReader(System.in));
+  
+  public static void main(String args[]) {
+    try {
+      // Further code will be added here
+    
+	} catch(Exception e) {
+      e.printStackTrace();
+    }
+  }
+}
+</pre>
+</blockquote>
+<p><font size="2" face="Verdana, Arial, Helvetica, sans-serif">The next few sections 
+  will guide you through making the initial connection, authenticating the user 
+  and executing<br>
+  a command or starting the users shell for a simple console based SSH application.</font></p>
+  <!--pagebreak-->
+<p><font size="2" face="Verdana, Arial, Helvetica, sans-serif"><br>
+  <em><strong>Making the initial connection</strong></em></font></p>
+<p><font size="2" face="Verdana, Arial, Helvetica, sans-serif"> To create an SshClient 
+  instance import the class into your implementation class file and use the following 
+  code<br>
+  to connect to an SSH server on the standard port 22.</font></p>
+<blockquote>
+  <pre>
+SshClient ssh 
+  = new SshClient();
+
+
+System.out.print("Host to connect: ");
+
+String hostname = reader.readLine();
+
+ssh.connect(hostname);</pre>
+</blockquote>
+<p><font size="2" face="Verdana, Arial, Helvetica, sans-serif"> When the client 
+  connects to the server, the server supplies its public key for the client to 
+  verify. You will see<br>
+  that calling the <code>connect</code> method prompts the user within the console 
+  to verify the key:</font></p>
+<p><code>The host firestar 
+  is currently unknown to the system<br>
+  The host key fingerprint is: 1028: 69 54 9c 49 e5 92 59 40 5 66 c5 2e 9d 86 
+  af ed<br>
+  Do you want to allow this host key? [Yes|No|Always]:</code></p>
+<p><font size="2" face="Verdana, Arial, Helvetica, sans-serif"> In the default 
+  implementation of the <code>connect</code> method, J2SSH reads the <em>$HOME/.ssh/known_hosts</em> 
+  file to determines to which hosts connections<br>
+  may be allowed. This is provided by the class ConsoleKnownHostsKeyVerification 
+  and the<br>
+  default behavior can be emulated by the following code:</font></p>
+<blockquote>
+  <pre> 
+import com.sshtools.j2ssh.transport.ConsoleKnownHostsKeyVerification;
+
+
+ssh.connect("firestar", new ConsoleKnownHostsKeyVerification());</pre>
+</blockquote>
+<p><font size="2" face="Verdana, Arial, Helvetica, sans-serif">When the connect 
+  method returns, the protocol has been negotiated and key exchange has taken 
+  place, leaving the connection ready for authenticating the user. </font></p>
+<!--pagebreak-->
+<p><font size="2" face="Verdana, Arial, Helvetica, sans-serif"><strong><em>Authenticating 
+  the user</em></strong></font></p>
+<p><font size="2" face="Verdana, Arial, Helvetica, sans-serif">Once the connection 
+  has been completed the user is required to provide a set of credentials for 
+  authentication.<br>
+  All client side authentication methods are implemented using the abstract class:</font></p>
+<blockquote><code>import com.sshtools.j2ssh.authentication.SshAuthenticationClient.</code></blockquote>
+<p><font size="2" face="Verdana, Arial, Helvetica, sans-serif"> To perform authentication, 
+  the SshClient class provides the following method:</font></p>
+<blockquote><code>public int authenticate(SshAuthenticationClient 
+  auth);</code></blockquote>
+<p><font size="2" face="Verdana, Arial, Helvetica, sans-serif">There are currently 
+  five authentication methods implemented by J2SSH, 'password', 'publickey', 'keyboard-interactive' 
+  and 'hostbased'. With an extra agent authentication method that performs public 
+  key authentication using the J2SSH key agent.</font></p>
+<p><font size="2" face="Verdana, Arial, Helvetica, sans-serif"> <em><strong>Password 
+  Authentication</strong></em></font></p>
+<p><font size="2" face="Verdana, Arial, Helvetica, sans-serif"> Password authentication 
+  is ideal for first time users as it requires no additional configuration within 
+  the SSH<br>
+  client or server. The user simply supplies his username and password to the 
+  client which is then transmitted over<br>
+  the encrypted connection to the server. The server then checks that the given 
+  password is acceptable to the native<br>
+  password-authentication mechanism of the host operating system and returns the 
+  result to the client.</font></p>
+<p><font size="2" face="Verdana, Arial, Helvetica, sans-serif">J2SSH implements 
+  the 'password' authentication method with the following class:</font></p>
+<blockquote><code>import com.sshtools.j2ssh.authentication.PasswordAuthenticationClient</code></blockquote>
+<p><font size="2" face="Verdana, Arial, Helvetica, sans-serif"> Using the password 
+  authentication method is straight forward; create an instance of the PasswordAuthentication<br>
+  class, set the username and password and pass to the SshClient to complete the 
+  authentication.</font></p>
+<blockquote>
+  <pre>
+ /** 
+  * Create a PasswordAuthenticationClient instance, set the properties
+  * and pass to the SessionClient to authenticate
+  */
+  PasswordAuthenticationClient pwd = new PasswordAuthenticationClient();
+  
+  System.out.print("Username: ");
+  String username = reader.readLine();
+  auth.setUsername(username);
+  
+  System.out.print("Password: ");
+  String password = reader.readLine();
+  auth.setPassword(password);
+  
+  int result = ssh.authenticate(pwd);
+  </pre>
+</blockquote>
+<p><font size="2" face="Verdana, Arial, Helvetica, sans-serif"><strong><em>The 
+  Authentication Result</em></strong></font></p>
+<p><font size="2" face="Verdana, Arial, Helvetica, sans-serif"> When the authentication 
+  method completes it returns the result of the authentication. This integer value 
+  can be any<br>
+  of the following three values defined in the class:</font></p>
+<blockquote>
+  <pre>
+import com.sshtools.j2ssh.authentication.AuthenticationProtocolState;
+  ..
+  ..
+  if(result==AuthenticationProtocolState.FAILED)
+     System.out.println("The authentication failed");
+
+  if(result==AuthenticationProtocolState.PARTIAL)
+     System.out.println("The authentication succeeded but another"
+	                   + "authentication is required");
+
+  if(result==AuthenticationProtocolState.COMPLETE)
+     System.out.println("The authentication is complete");</pre>
+</blockquote>
+<!--pagebreak-->
+<p><font size="2" face="Verdana, Arial, Helvetica, sans-serif"><strong><em>Retrieving 
+  the available authentication Methods</em></strong></font></p>
+<p><font size="2" face="Verdana, Arial, Helvetica, sans-serif"> It is possible 
+  at any time after the connection has been established and before authentication 
+  has been completed to request a list of authentication methods that can be used. 
+  The getAvailableAuthMethods method returns a list of authentication method names.</font></p>
+<blockquote><code>public List getAvailableAuthMethods(String 
+  username);</code></blockquote>
+<p><font size="2" face="Verdana, Arial, Helvetica, sans-serif"> <em>It should 
+  be noted that the SSH specification allows the server to return authentication 
+  methods that are not valid<br>
+  for the user.</em></font></p>
+<p><font size="2" face="Verdana, Arial, Helvetica, sans-serif"><strong><em>Prompting 
+  the User for Authentication Details?</em></strong></font></p>
+<p><font size="2" face="Verdana, Arial, Helvetica, sans-serif"> Each SshAuthenticationClient 
+  implementation can optionally be set a prompt interface which allows the user 
+  to<br>
+  be prompted for the information once the authenticate method has been invoked.</font></p>
+<blockquote>
+  <pre>
+public interface SshAuthenticationPrompt {
+  public boolean showPrompt(SshAuthenticationClient instance) 
+                              throws AuthenticationProtocolException;
+  }
+}</pre>
+</blockquote>
+<p><font size="2" face="Verdana, Arial, Helvetica, sans-serif"> The showPrompt 
+  method is called if the authentication instance is not ready to authenticate. 
+  The methods is called and the developer should verify the instance of the SshAuthenticationClient 
+  to make sure that it is compatible with the prompt (for example you cannot perform 
+  public key authentication<br>
+  with a password prompt!). The user should then be duly prompted for the information 
+  and the instance set with the user's information. Once<br>
+  complete, the prompt returns true to indicate that the user successfully entered 
+  correct information.</font></p>
+<p><font size="2" face="Verdana, Arial, Helvetica, sans-serif"> There are several 
+  prompts provided in the J2SSH common packages that provide useful Swing based 
+  dialogs to<br>
+  prompt the user.</font></p>
+<blockquote>
+  <pre> 
+import com.sshtools.common.authentication.PasswordAuthenticationDialog;
+  
+/***
+* Create a PasswordAuthenticationDialog instance and call the
+* showAuthenticationMethod so the user can graphically
+* enter their username and password
+*/
+
+
+PasswordAuthenticationClient pwd = 
+            new PasswordAuthenticationClient();
+			
+PasswordAuthenticationDialog dialog = 
+            new PasswordAuthenticationDialog(parent);
+			
+pwd.setAuthenticationPrompt(dialog);
+
+int result;
+result = ssh.authenticate(pwd);
+  </pre>
+</blockquote>
+<!--pagebreak-->
+<p><font size="2" face="Verdana, Arial, Helvetica, sans-serif"><strong><em>Using 
+  a session channel to execute a command or start the users shell</em></strong></font></p>
+<p><font size="2" face="Verdana, Arial, Helvetica, sans-serif"> Once the user 
+  is authenticated you will probably want to do something such as execute a command 
+  or start the users shell. The SSH protocol provides multiplexed channels over 
+  a single connection and the session channel is one of the channels defined by 
+  the SSH protocol. The session channel allows the client to execute a single 
+  command on the remote host and to communicate with the process by sending and 
+  receiving data. The J2SSH SessionChannelClient implements this channel and we 
+  will use this to execute a basic "ls" command.</font></p>
+<p><font size="2" face="Verdana, Arial, Helvetica, sans-serif">The session channel provides 
+  an inputstream and outputstream for reading/writing, but before we can do this 
+  we need to setup the channel for our command. First we open the channel itself 
+  by calling the SshClient method:</font></p>
+<blockquote>
+  <pre> 
+SessionChannelClient session = ssh.openSessionChannel();</pre>
+</blockquote>
+<p><font size="2" face="Verdana, Arial, Helvetica, sans-serif"> Now that we have 
+  a session instance we need to configure it for our command, there are several 
+  options that can be set before we invoke one of the methods that will start 
+  the session.</font></p>
+<p><font size="2" face="Verdana, Arial, Helvetica, sans-serif"><em>Setting Environment 
+  Variables<br>
+  </em>The SSH protocol provides a method to set an environment variable for the 
+  processes environment, the protocol also leaves the actual implementation of 
+  this down the server implementation, and in our experience most servers do not 
+  allow for this for security reasons. However the method is available since its 
+  defined in the protocol specification, so your free to try to use it, but beware 
+  the variable may not be set!</font></p>
+<blockquote><code> public boolean 
+  setEnvironmentVariable(String name, String value);</code></blockquote>
+<p><font size="2" face="Verdana, Arial, Helvetica, sans-serif"><em>Requesting 
+  a Pseudo Terminal</em><br>
+  A pseudo terminal is a device that imitates a terminal. Rather than being connected 
+  to an actual terminal, a pseudo-terminal (or pty) is connected to a process. 
+  If the command you are executing is expecting a terminal (such as a shell command) 
+  you can request that a pseudo terminal be attached to the process by calling 
+  the requestPseudoTerminal method.</font></p>
+<blockquote><code> public boolean 
+  requestPseudoTerminal(String term, int cols, int rows, int width, int height, 
+  String modes);</code></blockquote>
+<p><font size="2" face="Verdana, Arial, Helvetica, sans-serif"><em>Invoking a 
+  command<br>
+  </em>After the above operations have been performed you can then request that 
+  the session either start the user's shell, execute a specific command or start 
+  an SSH subsystem (such as SFTP). You should not invoke a subsystem unless you 
+  are able to read/write the subsystem protocol, there are many additional utilities 
+  within J2SSH that provide for the available subsystems.</font></p>
+<p><font size="2" face="Verdana, Arial, Helvetica, sans-serif">To start the users 
+  default shell use:</font></p>
+  <blockquote>
+  <code>public boolean startShell();</code></blockquote>
+<p><font size="2" face="Verdana, Arial, Helvetica, sans-serif">Or to execute a 
+  specific command use:</font></p>
+<blockquote><code>public boolean 
+  executeCommand(String command);</code></blockquote>
+<p><font size="2" face="Verdana, Arial, Helvetica, sans-serif"><em>An important 
+  note to remember is that this does not execute a shell command. You cannot for 
+  instance issue the command executeCommand("dir")" on the Windows 
+  Operating system as this is a shell command, instead use "cmd.exe /C dir". 
+  This method executes a binary executable and so should be used to execute any 
+  program other than the users shell.</em></font></p>
+  <!--pagebreak-->
+<p><font size="2" face="Verdana, Arial, Helvetica, sans-serif"> <strong><em>Handling 
+  Session Data</em></strong><br>
+  Once the session has been configured and a command or shell has been started, 
+  you can begin to<br>
+  transfer data to and from the remote computer using the sessions IO streams. 
+  These streams provide you with a<br>
+  standardized interface for reading and writing the data.</font></p>
+<p><font size="2" face="Verdana, Arial, Helvetica, sans-serif"><em> The Session 
+  Channel's OutputStream</em><br>
+  The format of writing data varies according to how you configured the session, 
+  for example if you executed the<br>
+  users shell then the data should be written as if the user had entered the commands 
+  interactively.</font></p>
+<blockquote><pre> 
+/** Writing to the session OutputStream */
+OutputStream out = session.getOutputStream();
+String cmd = "ls\n";
+out.write(cmd.getBytes());</pre></blockquote>
+<p><font size="2" face="Verdana, Arial, Helvetica, sans-serif"> <em> The Session 
+  Channel's InputStream</em></font></p>
+<blockquote><pre>
+/**
+* Reading from the session InputStream
+*/
+InputStream in = session.getInputStream();
+byte buffer[] = new byte[255];
+int read;
+while((read = in.read(buffer)) > 0) {
+   String out = new String(buffer, 0, read);
+   System.out.println(out);
+}
+</pre></blockquote>
+<p><font size="2" face="Verdana, Arial, Helvetica, sans-serif"> <em>Reading from 
+  stderr</em><br>
+  The session also provides the stderr data provided by the remote session. Again 
+  an InputStream is provided.</font></p>
+<blockquote><code> public InputStream 
+  session.getStderrInputStream();<br>
+  </code></blockquote>
+<p><font size="2" face="Verdana, Arial, Helvetica, sans-serif"><strong><em>Closing 
+  the Session</em></strong></font></p>
+<p><font size="2" face="Verdana, Arial, Helvetica, sans-serif">The session can 
+  be closed using the following method:</font></p>
+<blockquote><code> public void close();</code></blockquote>
+<p><em><strong><font size="2" face="Verdana, Arial, Helvetica, sans-serif">Disconnecting</font></strong></em></p>
+<p><font size="2" face="Verdana, Arial, Helvetica, sans-serif"> The connection 
+  can be terminated by either side. To terminate the connection call the SshClient 
+  method:</font></p>
+  <blockquote><code>
+  public void disconnect();</code></blockquote>
+<p><font size="2" face="Verdana, Arial, Helvetica, sans-serif"> <em><strong>A 
+  word on executing multiple commands</strong></em></font></p>
+<p><font size="2" face="Verdana, Arial, Helvetica, sans-serif">So we can now execute 
+  a single command on the remote server, but what's that I hear you say? I want 
+  to execute more than one command? Well if you cast your mind back I told you 
+  that the SSH protocol provides multiplexed channels over a single connection, 
+  so executing another command is as simple as executing the first, just create 
+  a new instance of the SessionChannelClient for every command you want to execute. 
+  You can execute them simultaneously or one after another, but always create 
+  a new session (since the session is closed when the command finishes and the 
+  protocol does not allow for re-using of a session to execute another command). 
+  </font></p>
+<p><font size="2" face="Verdana, Arial, Helvetica, sans-serif">There is a drawback 
+  to this in that the process environment is not passed on from one session to 
+  another, so you cannot for example execute a command to change directory and 
+  then another to execute a script in that directory, since the change directory 
+  is lost when the session closes and the new command starts back in the default 
+  working directory. Of course you could always put the cd command into the script? 
+  Or use the shell to execute both commands. This subject is certainly a bit more 
+  advanced so I will leave it for another day and pencil in a new article to discuss 
+  all the alternatives for executing multiple commands. </font></p>
+<p><font size="2" face="Verdana, Arial, Helvetica, sans-serif">This concludes 
+  our getting started tutorial, you should now have a basic working knowledge 
+  of how to connect, authenticate and execute commands using J2SSH. </font></p>
+</body>
+</html>

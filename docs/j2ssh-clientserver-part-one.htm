@@ -1,0 +1,204 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"
+"http://www.w3.org/TR/html4/loose.dtd">
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1">
+<title>Untitled Document</title>
+</head>
+
+<body>
+<h2><font face="Times New Roman, Times, serif"> <font face="Verdana, Arial, Helvetica, sans-serif">Part 1 </font></font> <font face="Verdana, Arial, Helvetica, sans-serif">- Securing your client-server application 
+  with J2SSH</font>
+</h2>
+<p><font size="2" face="Verdana, Arial, Helvetica, sans-serif">Using J2SSH is 
+  a great way to secure and enhance your insecure client-server application (or 
+  improve an SSL based one). Now it certainly would be a great idea at this point 
+  to spend some time evaluating the different methods of securing an applications 
+  communication, I could waste pages explaining about SSL or teaching you how 
+  to write your proprietary encryption process, but that's not why were here is 
+  it? And it's certainly not why I am here! You're here because you know SSH, 
+  you use it everyday to access every other computer your work on, or at least 
+  you should! You're here because SSH provides strong encryption, integrity checking 
+  and public key authentication of both the client and the server; the thing is 
+  you want your client-server application to provide that too, so that's what 
+  were going to do today. </font></p>
+<p><font size="2" face="Verdana, Arial, Helvetica, sans-serif">This tutorial assumes 
+  you have a working knowledge of SSH clients and servers. Most importantly you 
+  should understand the concept of SSH port forwarding. In this series of articles 
+  we will discuss two ways to secure your client-server application</font></p>
+<p><font size="2" face="Verdana, Arial, Helvetica, sans-serif"><em><strong>1. 
+  Secure existing applications by channelling the TCPIP data through a secure 
+  tunnel to an SSH server installed on the same machine as your application server</strong></em></font></p>
+<p><font size="2" face="Verdana, Arial, Helvetica, sans-serif">You may have already 
+  used standard SSH port forwarding to setup a secure tunnel to transport your 
+  connection, but maintaining both the SSH client and SSH server in addition to 
+  your own client and server is not a realistic proposition. </font></p>
+<p><font size="2" face="Verdana, Arial, Helvetica, sans-serif">The quickest way 
+  to secure your application with J2SSH is to use this very process, but instead 
+  of maintaining an SSH client, you can use J2SSH directly within your client 
+  code.</font></p>
+<p><font size="2" face="Verdana, Arial, Helvetica, sans-serif"><em><strong>2. 
+  Build an SSH server to provide your applications services.</strong></em></font></p>
+<p><font size="2" face="Verdana, Arial, Helvetica, sans-serif">J2SSH comes with 
+  a set of daemon classes that enable the creation of a custom SSH server in no 
+  time! The SSH server itself is already preconfigured to accept connections so 
+  the main framework is already available. Your responsibility firstly will be 
+  to develop an authentication provider to plug into your existing applications 
+  authentication mechanism, and secondly to provide a channel implementation that 
+  replaces your applications socket communication. There are of course a few more 
+  details but it could not be much simpler! </font></p>
+<!--pagebreak-->
+<p><font size="2" face="Verdana, Arial, Helvetica, sans-serif"><br>
+  <font size="4" face="Times New Roman, Times, serif">Securing existing applications by 
+  channelling TCPIP data through a secure tunnel</font></font></p>
+<p><font size="2" face="Verdana, Arial, Helvetica, sans-serif">This method essentially 
+  forwards your client-server communication through a secure tunnel just as if 
+  you had setup standard port forwarding between your client host and the server. 
+  The difference is that J2SSH does not require the installation of an SSH client, 
+  instead it allows your client application to connect to the SSH server directly 
+  and instruct the server where to forward the data to thus removing the configuration 
+  nightmare of using port forwarding. </font></p>
+<p><font size="2" face="Verdana, Arial, Helvetica, sans-serif"><strong><em>Setup 
+  an SSH server on the same host as your application server</em></strong></font></p>
+<p><font size="2" face="Verdana, Arial, Helvetica, sans-serif">First thing we 
+  need to do is to install an SSH server on the same host as your application 
+  server. That's up to you I'm afraid, we cannot help you out there. Once you 
+  have the server installed create an account on the host for your client application, 
+  J2SSH will need to authenticate to the SSH server, so it's a good idea to have 
+  an account for the application, and since we don't want to be putting passwords 
+  into the code we will also want a private key without a passphrase.</font></p>
+<p><font size="2" face="Verdana, Arial, Helvetica, sans-serif">Configure your 
+  applications account with the public key and test the connection; you should 
+  be able to connect without any prompting. Finally, setup your application server 
+  to listen on the local loopback address. This will ensure that clients cannot 
+  connect directly.</font></p>
+<p><font size="2" face="Verdana, Arial, Helvetica, sans-serif"><strong><em>Replace 
+  your existing client socket connection with an SSH connection using J2SSH</em></strong></font></p>
+<p><font size="2" face="Verdana, Arial, Helvetica, sans-serif">Now that we have 
+  a server installed, a private key for your application to authenticate with 
+  and your application server running, we can now turn to the client code changes. 
+  We need to replace your existing connection code with the following process</font></p>
+<ol>
+  <li><font size="2" face="Verdana, Arial, Helvetica, sans-serif">Create a connection 
+    to the SSH server</font></li>
+  <li><font size="2" face="Verdana, Arial, Helvetica, sans-serif"> Authenticate 
+    using the client applications public key</font></li>
+  <li><font size="2" face="Verdana, Arial, Helvetica, sans-serif"> Create a tunnel 
+    to your application server</font></li>
+  <li><font size="2" face="Verdana, Arial, Helvetica, sans-serif"> Start your 
+    own communication using the tunnel's IO streams</font></li>
+</ol>
+<p><font size="2" face="Verdana, Arial, Helvetica, sans-serif"><br>
+  Creating the connection is straight forward, you will obviously need to take 
+  into account integrating this code into your own client but the connection procedure 
+  is as follows</font></p>
+<code>
+<blockquote>import com.sshtools.j2ssh.SshClient;<br><br> 
+
+public SshClient createConnection() { <br>
+<blockquote>// Make a client connection SshClient <br>
+      ssh = new SshClient(); <br>
+  // Connect to the host <br>
+  ssh.connect("your-applications-host"); </blockquote>
+  } </blockquote>
+</code>
+<p><font size="2" face="Verdana, Arial, Helvetica, sans-serif">
+  If you run the above code you will notice that the user is prompted in the console 
+  to verify the host key of the server. Its probably going to be a good idea to 
+  override this default behaviour since not everyone will see the console output. 
+  There are a couple of methods available, you could use a different HostKeyVerification 
+  implementation, for example the DialogHostKeyVerification will prompt the user 
+  using a dialog, and there is also IgnoreHostKeyVerification which simply ignores 
+  the process. For now we will use this, since were sure that the server is correct, 
+  however when you deploy your client to production environments its wise to replace 
+  this with either the dialog verification or your own custom implementation. 
+  </font></p>
+<p></p>
+<p><font size="2" face="Verdana, Arial, Helvetica, sans-serif">Lets import the 
+  new verification process</font></p>
+<blockquote><code>import com.sshtools.j2ssh.transport.IgnoreHostKeyVerification;</code></blockquote>
+<p><font size="2" face="Verdana, Arial, Helvetica, sans-serif">
+  and change the connect call</font></p>
+  <blockquote><code>ssh.connect("your-applications-host", new IgnoreHostKeyVerification());</code></blockquote>
+<!--pagebreak-->
+<p><font size="2" face="Verdana, Arial, Helvetica, sans-serif"> Now we can connect 
+  to the SSH server, and the next step is to authenticate using our newly generated 
+  private key. First we need to open the private key file, this can be done with 
+
+  the following code.</font></p>
+  
+  <blockquote><code>import com.sshtools.j2ssh.transport.authentication.SshPrivateKeyFile;<br>
+  <br>
+  ....<br>
+  <br>
+  // Open up the private key file<br>
+  SshPrivateKeyFile file =<br>
+  SshPrivateKeyFile.parse(new File("filename"));</code></blockquote>
+<p><font size="2" face="Verdana, Arial, Helvetica, sans-serif"><br>
+  This provides us with a copy of the file in memory, since we don't have a passphrase 
+  on the key we can simply add the key to a new instance of the PublicKeyAuthenticationClient 
+  which we are going to use to authenticate with.</font></p>
+<blockquote><code>import com.sshtools.j2ssh.authentication.PublicKeyAuthenticationClient;<br>
+<br>
+.....<br>
+<br>
+PublicKeyAuthenticationClient 
+  pk = new PublicKeyAuthenticationClient();<br>
+  Pk.setUsername("username");<br>
+  Pk.setKey(file.toPrivateKey(null));</code></blockquote>
+<p><font size="2" face="Verdana, Arial, Helvetica, sans-serif">Now that the key 
+  is loaded into the authentication instance, we can authenticate.</font></p>
+<blockquote><code>if(ssh.autenticate(pk)== 
+  AuthenticationProtocolState.COMPLETED) {<br>
+<blockquote>// Authentication Complete</blockquote>
+}</code></blockquote>
+<p><font size="2" face="Verdana, Arial, Helvetica, sans-serif">Now that we have 
+  successfully authenticated, were ready to create the secure tunnel for your 
+  application. To do this we are going to create a local forwarding channel, local 
+  forwarding is initiated by the client where by remote forwarding is initiated 
+  by the server. This forwarding channel will provide a set of IO streams for 
+  your client application to use in place of the Sockets IO streams. </font></p>
+<blockquote><code>import com.sshtools.j2ssh.forwarding.ForwardingIOChannel;<br>
+  <br>
+  .....<br>
+  <br>
+  ForwardingIOChannel channel = new ForwardingIOChannel(
+  <blockquote> ForwardingIOChannel.LOCAL_FORWARDING_CHANNEL, <br>
+    "127.0.0.1",<br>
+      10022,<br>
+      "myhost",<br>
+    10022); </blockquote>
+  </code></blockquote>
+<p></p>
+<p><font size="2" face="Verdana, Arial, Helvetica, sans-serif">We now have a channel 
+  ready so lets waste no more time and open it</font></p>
+<blockquote><code>if(ssh.openChannel(channel)) 
+  {
+  <blockquote>// Channel is opened and can be used<br>
+  channel.getOutputStream("START".getBytes());<br>
+  ....</blockquote>
+  }</code></blockquote>
+<p><font size="2" face="Verdana, Arial, Helvetica, sans-serif"> Once the channel 
+  is open, you can use its IO streams in place of your Socket, your application 
+  should not require any changes.</font></p>
+<!--pagebreak-->
+<p><font size="2" face="Verdana, Arial, Helvetica, sans-serif"><strong><em>The 
+  advantages and disadvantages of using a secure tunnel</em></strong></font></p>
+<p><font size="2" face="Verdana, Arial, Helvetica, sans-serif">The main advantage 
+  of this method is that it's a quick fix for an insecure application. By forwarding 
+  the traffic through an embedded SSH tunnel your application's data is now secure. 
+  However, your server has no access to the strong authentication that the SSH 
+  server provides and you still need to maintain a separate SSH server and authentication 
+  details for your client application. Of course these can be minimized by embedding 
+  a private key into your client application but that in itself a potential 
+  security flaw. What you need is to have your server support SSH connections 
+  directly. </font></p>
+<p><font size="2" face="Verdana, Arial, Helvetica, sans-serif">In the next part 
+  of this series, I will show you how to build your own SSH server using the J2SSH 
+  daemon classes. Be prepared though as its not something you're going to be able 
+  to plug-in to your existing server, instead we will build an SSH server capable 
+  of supporting your applications proprietary protocol.<br>
+</font><font face="Verdana, Arial, Helvetica, sans-serif"> </font> </p>
+
+</body>
+</html>
