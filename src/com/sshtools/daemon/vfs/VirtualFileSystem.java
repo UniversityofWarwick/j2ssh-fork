@@ -739,14 +739,15 @@ public class VirtualFileSystem extends NativeFileSystemProvider {
                     int read = file.getRandomAccessFile().read(buf);
 
                     if (read >= 0) {
-                        if (read == buf.length) {
-                            return buf;
-                        } else {
+                    	  //I think this optimisation results 
+                    	  //in corrupt downloads, so taking it out.
+//                        if (read == buf.length) {
+//                            return buf;
+//                        } else {
                             byte[] tmp = new byte[read];
                             System.arraycopy(buf, 0, tmp, 0, read);
-
                             return tmp;
-                        }
+//                        }
                     } else {
                         throw new EOFException("The file is EOF");
                     }
