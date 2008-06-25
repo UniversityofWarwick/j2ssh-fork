@@ -765,14 +765,15 @@ public class SftpSubsystemServer extends SubsystemServer {
         // Get the native file system
         nfs = NativeFileSystemProvider.getInstance();
 
-        // Determine the users home directory
-        if (msg.getVersion().intValue() == VERSION_3) {
-            SshFxpVersion reply = new SshFxpVersion(new UnsignedInteger32(
-                        VERSION_3), null);
-            sendMessage(reply);
-        } else {
-            // Wrong version
-        }
+        /**
+         * The client tells the server what version it supports.
+         * Return a response of that version up to version 3, which is
+         * all this server supports.
+         */
+        int negotiatedVersion = Math.min(VERSION_3, msg.getVersion().intValue());
+        SshFxpVersion reply = new SshFxpVersion(new UnsignedInteger32(
+        		negotiatedVersion), null);
+        sendMessage(reply);
     }
 
 	public NativeFileSystemProvider getNativeFileSystemProvider() {
