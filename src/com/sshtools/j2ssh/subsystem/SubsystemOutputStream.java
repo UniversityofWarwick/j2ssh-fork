@@ -139,7 +139,7 @@ public class SubsystemOutputStream extends OutputStream {
             	//LOG.debug("Not enough bytes in buffer to make the message");
             }
         } else {
-        	LOG.debug("Haven't received the message length yet");
+        	//LOG.debug("Haven't received the message length yet");
         }
     }
 }
