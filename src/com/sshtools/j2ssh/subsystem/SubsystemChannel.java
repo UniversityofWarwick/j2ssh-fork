@@ -44,7 +44,7 @@ public abstract class SubsystemChannel extends Channel {
 
     public SubsystemChannel(String name) {
         this.name = name;
-        this.messageStore = new SubsystemMessageStore();
+        this.messageStore = new SubsystemMessageStore(name);
     }
 
     public SubsystemChannel(String name, SubsystemMessageStore messageStore) {

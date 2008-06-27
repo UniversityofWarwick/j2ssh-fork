@@ -90,7 +90,7 @@ public class KBIPasswordAuthenticationServer extends SshAuthenticationServer {
 
         SshMsgUserAuthInfoRequest info = new SshMsgUserAuthInfoRequest("Password authentication",
                 "", "");
-        info.addPrompt(msg.getUsername() + "'s password", false);
+        info.addPrompt(msg.getUsername() + "'s password: ", false);
         authentication.sendMessage(info);
 
         SshMessage response = authentication.readMessage();

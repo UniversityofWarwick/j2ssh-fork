@@ -45,8 +45,8 @@ import java.io.*;
  */
 public abstract class SubsystemServer implements Runnable {
     private static Log log = LogFactory.getLog(SubsystemServer.class);
-    private SubsystemMessageStore incoming = new SubsystemMessageStore();
-    private SubsystemMessageStore outgoing = new SubsystemMessageStore();
+    private SubsystemMessageStore incoming = new SubsystemMessageStore("incoming");
+    private SubsystemMessageStore outgoing = new SubsystemMessageStore("outgoing");
     private SubsystemInputStream in = new SubsystemInputStream(outgoing);
     private SubsystemOutputStream out = new SubsystemOutputStream(incoming);
     private SshThread thread;

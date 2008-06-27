@@ -1,15 +1,13 @@
 package com.sshtools.j2ssh.subsystem;
 
-import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
-import java.io.ObjectOutputStream;
 import java.util.ArrayList;
 import java.util.List;
 
+import junit.framework.TestCase;
+
 import com.sshtools.j2ssh.sftp.SshFxpStatus;
 import com.sshtools.j2ssh.transport.InvalidMessageException;
-
-import junit.framework.TestCase;
 
 public class SubsystemOutputStreamTest extends TestCase {
 	public void testMessages() throws Exception {
@@ -18,7 +16,7 @@ public class SubsystemOutputStreamTest extends TestCase {
 		
 		final List<byte[]> m = new ArrayList<byte[]>();
 		
-		SubsystemMessageStore store = new SubsystemMessageStore() {
+		SubsystemMessageStore store = new SubsystemMessageStore("test") {
 			@Override
 			public synchronized void addMessage(byte[] msgdata)
 					throws InvalidMessageException {

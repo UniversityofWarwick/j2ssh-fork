@@ -68,7 +68,7 @@ public abstract class SubsystemClient implements Runnable {
      */
     public SubsystemClient(String name) {
         this.name = name;
-        messageStore = new SubsystemMessageStore();
+        messageStore = new SubsystemMessageStore("incoming");
     }
 
     /**

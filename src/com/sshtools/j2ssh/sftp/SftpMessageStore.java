@@ -43,7 +43,8 @@ class SftpMessageStore extends SubsystemMessageStore {
     /**
      * Creates a new SftpMessageStore object.
      */
-    public SftpMessageStore() {
+    public SftpMessageStore(final String name) {
+    	super(name);
     }
 
     /**

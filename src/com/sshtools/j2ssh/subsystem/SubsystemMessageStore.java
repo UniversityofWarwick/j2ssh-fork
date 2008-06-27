@@ -59,10 +59,13 @@ public class SubsystemMessageStore {
     protected Map<Integer, Class> registeredMessages = new HashMap<Integer, Class>();
     private OpenClosedState state = new OpenClosedState(OpenClosedState.OPEN);
 
+    private String name;
+    
     /**
      * Creates a new SubsystemMessageStore object.
      */
-    public SubsystemMessageStore() {
+    public SubsystemMessageStore(final String name) {
+    	this.name = name;
     }
 
     /**
@@ -73,7 +76,7 @@ public class SubsystemMessageStore {
     public synchronized void addMessage(SubsystemMessage msg) {
         if (log.isDebugEnabled()) {
             log.debug("Received " + msg.getMessageName() +
-                " subsystem message");
+                " subsystem message on " + name);
         }
 
         // Add the message
