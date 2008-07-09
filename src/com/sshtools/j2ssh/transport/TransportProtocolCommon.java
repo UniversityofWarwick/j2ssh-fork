@@ -31,6 +31,7 @@ import com.sshtools.j2ssh.configuration.ConfigurationLoader;
 import com.sshtools.j2ssh.configuration.SshConnectionProperties;
 import com.sshtools.j2ssh.io.ByteArrayWriter;
 import com.sshtools.j2ssh.net.TransportProvider;
+import com.sshtools.j2ssh.sftp.MessageRequestId;
 import com.sshtools.j2ssh.transport.kex.KeyExchangeException;
 import com.sshtools.j2ssh.transport.kex.SshKeyExchange;
 import com.sshtools.j2ssh.transport.kex.SshKeyExchangeFactory;
@@ -415,7 +416,11 @@ implements TransportProtocol, Runnable
         // the list unless of course it is a transport protocol or key
         // exchange message
         if (log.isDebugEnabled()) {
-            log.info("Sending " + msg.getMessageName());
+        	if (msg instanceof MessageRequestId) {
+        		log.debug("Sending " + msg.getMessageName() + ", ID=" + ((MessageRequestId)msg).getId().intValue());
+        	} else {
+        		log.debug("Sending " + msg.getMessageName());
+        	}
         }
 
         int currentState = state.getValue();
@@ -1390,7 +1395,9 @@ implements TransportProtocol, Runnable
 
             while (!hasmsg) {
                 try {
+                	if (log.isDebugEnabled()) log.debug("Getting a message");
                     msgdata = sshIn.readMessage();
+                    if (log.isDebugEnabled()) log.debug("Got a message");
                     hasmsg = true;
                 } catch (InterruptedIOException ex /*SocketTimeoutException ex*/) {
                     log.info("Possible timeout on transport inputstream");
@@ -1414,7 +1421,11 @@ implements TransportProtocol, Runnable
                     msg = ms.createMessage(msgdata);
 
                     if (log.isDebugEnabled()) {
-                        log.info("Received " + msg.getMessageName());
+	                	if (msg instanceof MessageRequestId) {
+	                		log.debug("Received " + msg.getMessageName() + ", ID=" + ((MessageRequestId)msg).getId().intValue());
+	                	} else {
+	                		log.debug("Received " + msg.getMessageName());
+	                	}
                     }
 
                     ms.addMessage(msg);

@@ -39,13 +39,13 @@ import java.util.Map;
 
 
 /**
- *
- *
- * @author $author$
- * @version $Revision: 1.16 $
+ * Message sent in response to SshFxpInit. The init
+ * from the client contains a suggested protocol version;
+ * the version in this message is the version that the
+ * server decides both ends can understand.
  */
 public class SshFxpVersion extends SubsystemMessage {
-    /**  */
+    /** The ID of this message type. */
     public static final int SSH_FXP_VERSION = 2;
     private UnsignedInteger32 version;
     private Map extended = null;
@@ -69,32 +69,17 @@ public class SshFxpVersion extends SubsystemMessage {
         this.extended = extended;
     }
 
-    /**
-     *
-     *
-     * @return
-     */
+
     public UnsignedInteger32 getVersion() {
         return version;
     }
 
-    /**
-     *
-     *
-     * @return
-     */
+
     public Map getExtended() {
         return extended;
     }
 
-    /**
-     *
-     *
-     * @param bar
-     *
-     * @throws IOException
-     * @throws InvalidMessageException
-     */
+
     public void constructMessage(ByteArrayReader bar)
         throws IOException, InvalidMessageException {
         version = bar.readUINT32();
@@ -110,23 +95,12 @@ public class SshFxpVersion extends SubsystemMessage {
         }
     }
 
-    /**
-     *
-     *
-     * @return
-     */
+
     public String getMessageName() {
         return "SSH_FXP_INIT";
     }
 
-    /**
-     *
-     *
-     * @param baw
-     *
-     * @throws IOException
-     * @throws InvalidMessageException
-     */
+
     public void constructByteArray(ByteArrayWriter baw)
         throws IOException, InvalidMessageException {
         baw.writeUINT32(version);

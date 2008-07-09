@@ -67,23 +67,16 @@ public abstract class SubsystemMessage {
     }
 
     /**
-     *
-     *
-     * @param baw
-     *
-     * @throws InvalidMessageException
-     * @throws IOException
+     * Serializes this object and writes it to {@code baw}.
+     * 
+     * Deserialization is handled by {@link #constructMessage(ByteArrayReader)}.
      */
     public abstract void constructByteArray(ByteArrayWriter baw)
         throws InvalidMessageException, IOException;
 
     /**
-     *
-     *
-     * @param bar
-     *
-     * @throws InvalidMessageException
-     * @throws IOException
+     * An implementation of this will populate the message
+     * from its binary form, reading bytes from {@code bar}.
      */
     public abstract void constructMessage(ByteArrayReader bar)
         throws InvalidMessageException, IOException;

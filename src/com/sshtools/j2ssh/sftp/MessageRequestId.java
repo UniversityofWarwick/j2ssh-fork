@@ -28,7 +28,7 @@ package com.sshtools.j2ssh.sftp;
 import com.sshtools.j2ssh.io.*;
 
 
-interface MessageRequestId {
+public interface MessageRequestId {
     /**
      *
      *

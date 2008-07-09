@@ -228,10 +228,11 @@ class TransportProtocolInputStream {
     public byte[] readMessage() throws SocketException, IOException {
         // Reset the message for the next
         message.reset();
-
+        
         // Read the first byte of this message (this is so we block
         // but we will determine the cipher length before reading all
         read = readBufferedData(initial, 0, cipherlen);
+        
 
         cipher = algorithms.getCipher();
 
@@ -264,6 +265,7 @@ class TransportProtocolInputStream {
         if (count < initial.length) {
             count += readBufferedData(initial, count, initial.length - count);
         }
+        
 
         // Record the mac length
         if (hmac != null) {
@@ -283,12 +285,16 @@ class TransportProtocolInputStream {
         // Preview the message length
         msglen = (int) ByteArrayReader.readInt(initial, 0);
 
+        //if (log.isDebugEnabled()) log.debug("Start of message of length " + msglen);
+        
         padlen = initial[4];
 
         // Read, decrypt and save the remaining data
         remaining = (msglen - (cipherlen - 4));
 
         while (remaining > 0) {
+        	//if (log.isDebugEnabled()) log.debug("Reading rest of message, bytes left: " + remaining);
+        	
             read = readBufferedData(data, 0,
                     (remaining < data.length)
                     ? ((remaining / cipherlen) * cipherlen)
@@ -300,6 +306,8 @@ class TransportProtocolInputStream {
                                            : cipher.transform(data, 0, read),
                 0, read);
         }
+        //if (log.isDebugEnabled()) log.debug("Finished reading message");
+    
 
         synchronized (sequenceLock) {
             if (hmac != null) {

@@ -108,11 +108,12 @@ public class SubsystemOutputStream extends OutputStream {
     private void processMessage() throws IOException {
         // Now try to process a message
         if (buffer.size() > (messageStart + LENGTH_BYTES)) {
+        	//Messagelength is the length of data AFTER the 4 bytes containing the length.
             int messageLength = (int) ByteArrayReader.readInt(buffer.toByteArray(),
                     messageStart);
             
             if (messageLength + messageStart <= (buffer.size() - LENGTH_BYTES)) {
-            	//LOG.debug("Message: "+messageLength+", messageStart:"+messageStart+", buffer:"+(buffer.size() - LENGTH_BYTES));
+            	LOG.debug("COMPLETED Message: "+messageLength+", messageStart:"+messageStart+", buffer:"+(buffer.size() - LENGTH_BYTES));
                 byte[] msgdata = new byte[messageLength];
 
                 // Process a message
@@ -128,18 +129,23 @@ public class SubsystemOutputStream extends OutputStream {
                 }
 
                 if (messageLength + messageStart == (buffer.size() - LENGTH_BYTES)) {
-                	//LOG.debug("Message reaches end of buffer. resetting it.");
+                	LOG.debug("Message reaches end of buffer. resetting it.");
                     buffer.reset();
                     messageStart = 0;
                 } else {
-                	//LOG.debug("Extra bytes at the end of the message. Moving messageStart.");
+                	int remaining = buffer.size() - (LENGTH_BYTES + messageLength + messageStart);
+                	LOG.debug(remaining + " bytes at the end of the message. Moving messageStart.");
                     messageStart += messageLength + LENGTH_BYTES;
+                    //write() may not get called again, so
+                    //we need to check whether these extra bytes are a whole
+                    //message. Otherwise it will be stuck in buffer limbo.
+                    processMessage();
                 }
             } else {
-            	//LOG.debug("Not enough bytes in buffer to make the message");
+            	LOG.debug("Incomplete message: "+messageLength+", messageStart:"+messageStart+", buffer:"+(buffer.size() - LENGTH_BYTES));
             }
         } else {
-        	//LOG.debug("Haven't received the message length yet");
+        	LOG.debug("Haven't received the message length yet");
         }
     }
 }
