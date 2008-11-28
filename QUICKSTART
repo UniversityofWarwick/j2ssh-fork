@@ -6,5 +6,6 @@ Copy *.jar from dist/lib
 	into a directory somewhere.
 From within this directory run
 
+#build classpath of colon-separated jar files
 cp=$(echo *.jar | sed 's/ /:/g')
-java -cp $cp -D sshtools.home=. com.sshtools.daemon.SshDaemon -start
+java -Dsshtools.home=. -cp $cp com.sshtools.daemon.SshDaemon -start

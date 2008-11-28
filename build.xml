@@ -151,6 +151,17 @@ communication over insecure networks.</p>]]></doctitle>
 	<delete dir="${build.dist}"/>
 </target>
 
+<target name="quickstart">	
+	<java fork="true" classname="com.sshtools.daemon.SshDaemon">
+		<jvmarg value="-Dsshtools.home=conf/" />
+		<arg value="-start" />
+		<classpath>
+			<fileset dir="dist/lib" includes="*.jar" />
+			<fileset dir="lib" includes="*.jar" />
+			<fileset dir="conf" includes="*" />
+		</classpath>
+	</java>
+</target>
 
 <target name="release">
 
