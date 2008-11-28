@@ -1,0 +1,10 @@
+This will get a server running in the minimum time for testing.
+
+Copy *.jar from dist/lib
+	*.jar from lib
+	* from conf
+	into a directory somewhere.
+From within this directory run
+
+cp=$(echo *.jar | sed 's/ /:/g')
+java -cp $cp -D sshtools.home=. com.sshtools.daemon.SshDaemon -start
