@@ -62,8 +62,8 @@ public class SftpSubsystemServer extends SubsystemServer {
     private NativeFileSystemProvider nfs;
 
     /**
- * Creates a new SftpSubsystemServer object.
- */
+	 * Creates a new SftpSubsystemServer object.
+	 */
     public SftpSubsystemServer() {
         registerMessage(SshFxpInit.SSH_FXP_INIT, SshFxpInit.class);
         registerMessage(SshFxpMkdir.SSH_FXP_MKDIR, SshFxpMkdir.class);
@@ -121,7 +121,16 @@ public class SftpSubsystemServer extends SubsystemServer {
  * @param msg
  */
     protected void onMessageReceived(SubsystemMessage msg) {
+    	
+    	//Not in the main switch because the messageType will be
+    	//that of whatever message it was a piece of.
+    	if (msg instanceof IncompleteMessage) {
+        	onIncompleteMessage((IncompleteMessage)msg);
+        	return;
+    	}
+    	
         switch (msg.getMessageType()) {
+        
         case SshFxpInit.SSH_FXP_INIT: {
             onInitialize((SshFxpInit) msg);
 
@@ -130,7 +139,6 @@ public class SftpSubsystemServer extends SubsystemServer {
 
         case SshFxpMkdir.SSH_FXP_MKDIR: {
             onMakeDirectory((SshFxpMkdir) msg);
-
             break;
         }
 
@@ -241,7 +249,24 @@ public class SftpSubsystemServer extends SubsystemServer {
         }
     }
 
-    private void onSetAttributes(SshFxpSetStat msg) {
+    /**
+     * The SubsystemOutputStream has been configured to wait a certain
+     * amount of time holding part of a message without any further data
+     * before discarding it as an incomplete message. It still gets put
+     * in the store as an IncompleteMessage, so here we send back a reply
+     * to say the message was bad. Hopefully the client will try again.
+     */
+    private void onIncompleteMessage(IncompleteMessage msg) {
+    	//log.warn("Replying to incomplete message with STATUS_FX_BAD_MESSAGE");
+    	log.warn("Replying to incomplete message with STATUS_FX_OK, just to see what will happen...");
+		SubsystemMessage reply = new SshFxpStatus(msg.getId(),
+                //new UnsignedInteger32(SshFxpStatus.STATUS_FX_BAD_MESSAGE),
+				new UnsignedInteger32(SshFxpStatus.STATUS_FX_OK),
+                "Yup yup yup, uhuh", "");
+		sendMessage(reply);
+	}
+
+	private void onSetAttributes(SshFxpSetStat msg) {
         SubsystemMessage reply;
 
         try {

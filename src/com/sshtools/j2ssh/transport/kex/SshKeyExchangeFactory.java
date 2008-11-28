@@ -47,13 +47,14 @@ import java.util.Map;
  * @author $author$
  * @version $Revision: 1.28 $
  */
+@SuppressWarnings("unchecked")
 public class SshKeyExchangeFactory {
-    private static Map kexs;
+    private static Map<String, Class<? extends SshKeyExchange>> kexs;
     private static String defaultAlgorithm;
     private static Log log = LogFactory.getLog(SshKeyExchangeFactory.class);
 
     static {
-        kexs = new HashMap();
+        kexs = new HashMap<String, Class<? extends SshKeyExchange>>();
         log.info("Loading key exchange methods");
         kexs.put("diffie-hellman-group1-sha1", DhGroup1Sha1.class);
 
@@ -64,13 +65,9 @@ public class SshKeyExchangeFactory {
                 SshAPIConfiguration config = (SshAPIConfiguration) ConfigurationLoader.getConfiguration(SshAPIConfiguration.class);
 
                 if (config != null) {
-                    List list = config.getKeyExchangeExtensions();
-
+                    List<ExtensionAlgorithm> list = config.getKeyExchangeExtensions();
                     if (list != null) {
-                        Iterator it = list.iterator();
-
-                        while (it.hasNext()) {
-                            ExtensionAlgorithm algorithm = (ExtensionAlgorithm) it.next();
+                        for (ExtensionAlgorithm algorithm : list) {
                             String name = algorithm.getAlgorithmName();
 
                             if (kexs.containsKey(name)) {
@@ -85,7 +82,7 @@ public class SshKeyExchangeFactory {
 
                             try {
                                 kexs.put(algorithm.getAlgorithmName(),
-                                    ConfigurationLoader.getExtensionClass(
+                                    (Class<? extends SshKeyExchange>) ConfigurationLoader.getExtensionClass(
                                         algorithm.getImplementationClass()));
                             } catch (ClassNotFoundException cnfe) {
                                 log.error("Could not locate " +
@@ -101,9 +98,7 @@ public class SshKeyExchangeFactory {
         }
 
         if ((defaultAlgorithm == null) || !kexs.containsKey(defaultAlgorithm)) {
-            log.debug(
-                "The default key exchange is not set! using first in list");
-
+            log.debug("The default key exchange is not set! using first in list");
             Iterator it = kexs.keySet().iterator();
             defaultAlgorithm = (String) it.next();
         }
@@ -135,8 +130,8 @@ public class SshKeyExchangeFactory {
      *
      * @return
      */
-    public static List getSupportedKeyExchanges() {
-        return new ArrayList(kexs.keySet());
+    public static List<String> getSupportedKeyExchanges() {
+        return new ArrayList<String>(kexs.keySet());
     }
 
     /**

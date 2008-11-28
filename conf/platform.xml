@@ -4,11 +4,15 @@ Platform configuration file - Determines the behaviour of platform specific serv
 -->
 <PlatformConfiguration>
    <!-- The process provider for executing and redirecting a process -->
-   <NativeProcessProvider></NativeProcessProvider>
+   <NativeProcessProvider>com.sshtools.daemon.platform.UnsupportedShellProcessProvider</NativeProcessProvider>
    <!-- The authentication provider for authenticating users and obtaining user information -->
-   <NativeAuthenticationProvider></NativeAuthenticationProvider>
+   <!-- 
+   		WARNING: the dummy provider here doesn't ask for any passwords so obviously it's
+   		extremely insecure. You should only use it for testing. 
+   	-->
+   <NativeAuthenticationProvider>com.sshtools.daemon.platform.DummyAuthenticationProvider</NativeAuthenticationProvider>
    <!-- The file system provider for SFTP -->
-   <NativeFileSystemProvider></NativeFileSystemProvider>
+   <NativeFileSystemProvider>com.sshtools.daemon.vfs.VirtualFileSystem</NativeFileSystemProvider>
    <!-- Native settings which may be used by the process or authentication provider -->
    <!-- Add native settings here -->
    <!-- <NativeSetting Name="AuthenticateOnDomain" Value="."/> -->

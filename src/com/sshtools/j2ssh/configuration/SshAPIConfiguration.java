@@ -75,7 +75,7 @@ public interface SshAPIConfiguration {
      *
      * @return
      */
-    public List getKeyExchangeExtensions();
+    public List<ExtensionAlgorithm> getKeyExchangeExtensions();
 
     /**
      *

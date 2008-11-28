@@ -86,6 +86,13 @@ public class SubsystemOutputStreamTest extends TestCase {
 		os.write(data, 7, 15);
 		
 		assertEquals(3, store.getMessages().size());
+		
+		//if we re-write the same buffer, it adds three messages
+		//each time.
+		os.write(data);
+		assertEquals(6, store.getMessages().size());
+		os.write(data);
+		assertEquals(9, store.getMessages().size());
 	}
 	
 	class MockMessageStore extends SubsystemMessageStore {

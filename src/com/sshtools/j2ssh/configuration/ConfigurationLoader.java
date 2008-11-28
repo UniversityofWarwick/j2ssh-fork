@@ -174,7 +174,6 @@ public class ConfigurationLoader {
      */
     public static void initialize(boolean force, ConfigurationContext context)
         throws ConfigurationException {
-        // }
         try {
             String javaversion = System.getProperty("java.version");
             log.info("JAVA version is " + javaversion);
@@ -196,8 +195,7 @@ public class ConfigurationLoader {
 
                     // Attempt to load a JCE Provider - replace or remove these statements
                     // depending upon how you want to initialize your JCE provider
-                    Class cls;
-                    cls = Class.forName(
+                    Class cls = Class.forName(
                             "org.bouncycastle.jce.provider.BouncyCastleProvider");
                     java.security.Security.addProvider((java.security.Provider) cls.newInstance());
                 }
@@ -302,7 +300,8 @@ public class ConfigurationLoader {
      *
      * @throws ConfigurationException
      */
-    public static Object getConfiguration(Class cls)
+    @SuppressWarnings("unchecked")
+	public static <T> T getConfiguration(Class<T> cls)
         throws ConfigurationException {
         if (contexts.size() > 0) {
             Iterator it = contexts.iterator();
@@ -311,7 +310,7 @@ public class ConfigurationLoader {
                 ConfigurationContext context = (ConfigurationContext) it.next();
 
                 if (context.isConfigurationAvailable(cls)) {
-                    return context.getConfiguration(cls);
+                    return (T)context.getConfiguration(cls);
                 }
             }
         }
@@ -339,7 +338,7 @@ public class ConfigurationLoader {
      * @throws ClassNotFoundException
      * @throws ConfigurationException
      */
-    public static Class getExtensionClass(String name)
+    public static Class<?> getExtensionClass(String name)
         throws ClassNotFoundException, ConfigurationException {
         if (!initialized) {
             initialize(false);

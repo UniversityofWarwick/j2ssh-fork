@@ -43,7 +43,6 @@ import java.util.Random;
 
 
 class TransportProtocolOutputStream {
-    //implements Runnable {
     private static Log log = LogFactory.getLog(TransportProtocolOutputStream.class);
     private OutputStream out;
 
@@ -64,20 +63,12 @@ class TransportProtocolOutputStream {
      *
      * @throws TransportProtocolException
      */
-    public TransportProtocolOutputStream( /*Socket socket,*/
-        OutputStream out, TransportProtocolCommon transport,
-        TransportProtocolAlgorithmSync algorithms)
+    public TransportProtocolOutputStream(OutputStream out, TransportProtocolCommon transport,
+	        TransportProtocolAlgorithmSync algorithms)
         throws TransportProtocolException {
-        // try {
-        //this.socket = socket;
         this.out = out; //socket.getOutputStream();
         this.transport = transport;
         this.algorithms = algorithms;
-
-        /* } catch (IOException ioe) {
-               throw new TransportProtocolException(
-          "Failed to obtain socket output stream");
-           }*/
     }
 
     /**
@@ -140,9 +131,9 @@ class TransportProtocolOutputStream {
             message.write(msgdata, 0, msgdata.length);
 
             // Create some random data for the padding
+            // (disguises the true length of the message)
             byte[] pad = new byte[padding];
             rnd.nextBytes(pad);
-
             // Write the padding
             message.write(pad);
 
@@ -189,8 +180,7 @@ class TransportProtocolOutputStream {
                 throw new TransportProtocolException("IO Error on socket: " +
                     ioe.getMessage());
             }
-        }
-        finally {
+        } finally {
             algorithms.release();
         }
     }

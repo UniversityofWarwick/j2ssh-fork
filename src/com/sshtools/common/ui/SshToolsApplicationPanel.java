@@ -635,7 +635,7 @@ public abstract class SshToolsApplicationPanel extends JPanel {
                 java.lang.reflect.Method method = exception.getClass()
                                                            .getMethod("getCause",
                         new Class[] {  });
-                Throwable cause = (Throwable) method.invoke(exception, null);
+                Throwable cause = (Throwable) method.invoke(exception, (Object[])null);
 
                 if (cause != null) {
                     appendException(cause, level + 1, buf, details);

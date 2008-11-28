@@ -606,7 +606,7 @@ public class VirtualFileSystem extends NativeFileSystemProvider {
                 File[] children = dir.getChildren();
 
                 if (children == null) {
-                    throw new IOException("Permission denined.");
+                    throw new IOException("Permission denied.");
                 }
 
                 int count = ((children.length - pos) < 100)
@@ -630,8 +630,7 @@ public class VirtualFileSystem extends NativeFileSystemProvider {
                     throw new EOFException("There are no more files");
                 }
             } else {
-                throw new InvalidHandleException(
-                    "Handle is not an open directory");
+                throw new InvalidHandleException("Handle is not an open directory");
             }
         } else {
             throw new InvalidHandleException("The handle is invalid");

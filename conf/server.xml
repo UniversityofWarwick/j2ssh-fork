@@ -1,8 +1,8 @@
 <?xml version="1.0"?>
 <ServerConfiguration>
 	<!-- this key needs generating by the provided keygen tool -->
-	<ServerHostKey PrivateKeyFile="dsa.key"/>
-	<Port>22</Port>
+	<ServerHostKey PrivateKeyFile="sample-dsa.key"/>
+	<Port>2022</Port>
 	<!-- add other authentication methods as desired -->
 	<AllowedAuthentication>password</AllowedAuthentication>
 	<AllowedAuthentication>keyboard-interactive</AllowedAuthentication>

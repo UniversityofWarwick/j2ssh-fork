@@ -317,11 +317,11 @@ public class SessionChannelServer extends IOChannel {
             if (obj.getType().equals("class")) {
                 // Create the class implementation and start the subsystem
                 Class cls = Class.forName(obj.getProvider());
+                log.debug("Starting subsystem of type " + cls.getSimpleName());
                 subsystemInstance = (SubsystemServer) cls.newInstance();
                 subsystemInstance.setSession(this);
                 bindInputStream(subsystemInstance.getInputStream());
                 bindOutputStream(subsystemInstance.getOutputStream());
-
                 return true;
             } else {
                 // Determine the subsystem provider

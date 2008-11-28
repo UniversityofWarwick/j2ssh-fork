@@ -28,6 +28,7 @@ package com.sshtools.daemon.subsystem;
 import com.sshtools.daemon.session.*;
 
 import com.sshtools.j2ssh.*;
+import com.sshtools.j2ssh.sftp.IncompleteMessage;
 import com.sshtools.j2ssh.subsystem.*;
 import com.sshtools.j2ssh.transport.*;
 import com.sshtools.j2ssh.util.*;
@@ -59,6 +60,7 @@ public abstract class SubsystemServer implements Runnable {
  * Creates a new SubsystemServer object.
  */
     public SubsystemServer() {
+    	registerMessage(IncompleteMessage.FAKE_ID, IncompleteMessage.class);
     }
 
     /**
@@ -100,12 +102,20 @@ public abstract class SubsystemServer implements Runnable {
 
         try {
             while (state.getValue() == StartStopState.STARTED) {
+            	//log.debug("Checking for an incoming message...");
                 SubsystemMessage msg = incoming.nextMessage();
-
+//                if (log.isDebugEnabled()) {
+//                	log.debug(String.format("Processed message %s. %d messages left in queue.", 
+//                				msg.getClass().getSimpleName(), incoming.size()));
+//                }
                 if (msg != null) {
                     onMessageReceived(msg);
+                    //log.debug(String.format("Completed processing of message %s.", msg.getClass().getSimpleName()));
+                } else {
+                	log.debug("Null message");
                 }
             }
+            log.debug("SubsystemServer finished");
         } catch (MessageStoreEOFException meof) {
         }
 

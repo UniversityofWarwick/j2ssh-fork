@@ -829,7 +829,8 @@ public class ConnectionProtocol extends AsyncService {
                 "Remote computer sent data for non existent channel");
         }
 
-        channel.getLocalWindow().consumeWindowSpace(msg.getChannelData().length);
+        //http://sourceforge.net/tracker/index.php?func=detail&aid=2025955&group_id=60894&atid=495562
+        //channel.getLocalWindow().consumeWindowSpace(msg.getChannelData().length);
         channel.processChannelData(msg);
     }
 

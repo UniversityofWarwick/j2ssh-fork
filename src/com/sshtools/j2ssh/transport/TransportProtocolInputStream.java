@@ -25,31 +25,34 @@
  */
 package com.sshtools.j2ssh.transport;
 
+import java.io.BufferedInputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InterruptedIOException;
+import java.math.BigInteger;
+import java.net.SocketException;
+import java.util.Iterator;
+
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+
 import com.sshtools.j2ssh.io.ByteArrayReader;
 import com.sshtools.j2ssh.io.ByteArrayWriter;
 import com.sshtools.j2ssh.transport.cipher.SshCipher;
 import com.sshtools.j2ssh.transport.compression.SshCompression;
 import com.sshtools.j2ssh.transport.hmac.SshHmac;
 
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
-
-import java.io.BufferedInputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.InterruptedIOException;
-
-import java.math.BigInteger;
-
-import java.net.SocketException;
-
-import java.util.Iterator;
-
-
+/**
+ * This class is responsible for reading bytes from the Socket stream,
+ * decrypting and decompressing the bytes as necessary, and then returning
+ * the decrypted message. The readMessage() method does all this, waiting
+ * until the bytes for a whole message are available.
+ */
 class TransportProtocolInputStream {
     private static Log log = LogFactory.getLog(TransportProtocolInputStream.class);
+    private static final int DEFAULT_CIPHER_LENGTH = 8;
     private long bytesTransfered = 0;
-    private BufferedInputStream in;
+    private final InputStream in;
     private Object sequenceLock = new Object();
     private TransportProtocolCommon transport;
     private TransportProtocolAlgorithmSync algorithms;
@@ -58,20 +61,25 @@ class TransportProtocolInputStream {
     private SshCipher cipher;
     private SshHmac hmac;
     private SshCompression compression;
-    int msglen;
-    int padlen;
-    int read;
-    int remaining;
-    int cipherlen = 8;
-    int maclen = 0;
+    private int msglen;
+    private int padlen;
+    private int read;
+    private int remaining;
+    private int cipherlen = DEFAULT_CIPHER_LENGTH;
+    private int maclen = 0;
 
-    //byte[] buffer = new byte[128 * cipherlen];
-    ByteArrayWriter message = new ByteArrayWriter();
-    byte[] initial = new byte[cipherlen];
-    byte[] data = new byte[65535];
-    byte[] buffered = new byte[65535];
-    int startpos = 0;
-    int endpos = 0;
+    private ByteArrayWriter messageBytes = new ByteArrayWriter();
+    private byte[] initial = new byte[cipherlen];
+    private byte[] data = new byte[65535];
+    private byte[] buffered = new byte[65535];
+    private int startpos = 0;
+    private int endpos = 0;
+	
+    // debug variables.
+    private boolean blocking;
+	private int readLoops;
+	private long totalEverRead;
+	private long totalEverWritten;
 
     /**
      * Creates a new TransportProtocolInputStream object.
@@ -83,21 +91,28 @@ class TransportProtocolInputStream {
      * @throws IOException
      */
     public TransportProtocolInputStream(TransportProtocolCommon transport,
-        
-    /*Socket socket,*/
-    InputStream in, TransportProtocolAlgorithmSync algorithms)
+    			final InputStream in, TransportProtocolAlgorithmSync algorithms)
         throws IOException {
         this.transport = transport;
-
-        this.in = new BufferedInputStream(in); //socket.getInputStream());
-
+        this.in = new BufferedInputStream(in);
         this.algorithms = algorithms;
+    }
+    
+    
+    private void logInfo() {
+		/**
+		 * Log what's in the buffer. We want to see if there's data stuck. If it is
+		 * then we'd see blocking=true with readLoops>1, indicating it had read in some
+		 * data and now was waiting. In this case some data would be stuck.
+		 */
+		log.info(String.format("[tpis][%d - %d][blocking=%b][readLoops=%d][read/writ=%d/%d]", startpos, endpos, blocking,readLoops, totalEverRead,totalEverWritten));
+	
     }
 
     /**
-     *
-     *
-     * @return
+     * Every message has a sequence number, which is incremented by 1 each time.
+     * The value returned here is the number that will be assigned to the next
+     * message.
      */
     public synchronized long getSequenceNo() {
         return sequenceNo;
@@ -134,51 +149,51 @@ class TransportProtocolInputStream {
      */
     protected int readBufferedData(byte[] buf, int off, int len)
         throws IOException {
+    	
+    	// TODO investigate whether this method could be:
+    	//return in.read(buf,off,len);
+    	
         int read;
+        
+        int totalRead = 0;
 
+        //if we don't already have enough data...
         if ((endpos - startpos) < len) {
             // Double check the buffer has enough room for the data
+        	
             if ((buffered.length - endpos) < len) {
-                /*if (log.isDebugEnabled()) {
-                      log.debug("Trimming used data from buffer");
-                                 }*/
-
                 // no it does not odds are that the startpos is too high
                 System.arraycopy(buffered, startpos, buffered, 0,
                     endpos - startpos);
-
                 endpos -= startpos;
-
                 startpos = 0;
 
                 if ((buffered.length - endpos) < len) {
-                    //log.debug("Resizing message buffer");
+                    log.debug("Resizing message buffer");
                     // Last resort resize the buffer to the required length
                     // this should stop any chance of error
                     byte[] tmp = new byte[buffered.length + len];
-
                     System.arraycopy(buffered, 0, tmp, 0, endpos);
-
                     buffered = tmp;
                 }
             }
 
+                    
+            readLoops = 0;
             // If there is not enough data then block and read until there is (if still connected)
             while (((endpos - startpos) < len) &&
                     (transport.getState().getValue() != TransportProtocolState.DISCONNECTED)) {
                 try {
+                	//log.info("[TPIS][pre-socket-read]");
+                	blocking = true;
                     read = in.read(buffered, endpos, (buffered.length - endpos));
-                } catch (InterruptedIOException ex) {
+                    blocking = false;
+                    //log.info("[TPIS][post-socket-read]");
+                } catch (InterruptedIOException ex) { 
                     // We have an interrupted io; inform the event handler
+                	log.warn("Interrupted IO");
                     read = ex.bytesTransferred;
-
-                    Iterator it = transport.getEventHandlers().iterator();
-
-                    TransportProtocolEventHandler eventHandler;
-
-                    while (it.hasNext()) {
-                        eventHandler = (TransportProtocolEventHandler) it.next();
-
+                    for (TransportProtocolEventHandler eventHandler : transport.getEventHandlers()) {
                         eventHandler.onSocketTimeout(transport);
                     }
                 }
@@ -186,31 +201,26 @@ class TransportProtocolInputStream {
                 if (read < 0) {
                     throw new IOException("The socket is EOF");
                 }
-
+                readLoops++;
                 endpos += read;
+                totalRead += read;
+                totalEverRead += read;
             }
+            
+           
+        } else {
+        	//log.info("[TPIS][endpos-startpos >= len]");
         }
 
-        try {
-            System.arraycopy(buffered, startpos, buf, off, len);
-        } catch (Throwable t) {
-            System.out.println();
-        }
+        System.arraycopy(buffered, startpos, buf, off, len);
 
         startpos += len;
-
-        /*if (log.isDebugEnabled()) {
-               log.debug("Buffer StartPos=" + String.valueOf(startpos)
-                + " EndPos=" + String.valueOf(endpos));
-         }*/
+        
+        totalEverWritten += len;
 
         // Try to reset the buffer
         if (startpos >= endpos) {
-            //if (log.isDebugEnabled()) {
-            // log.debug("Buffer has been reset");
-            // }*/
             endpos = 0;
-
             startpos = 0;
         }
 
@@ -227,7 +237,7 @@ class TransportProtocolInputStream {
      */
     public byte[] readMessage() throws SocketException, IOException {
         // Reset the message for the next
-        message.reset();
+        messageBytes.reset();
         
         // Read the first byte of this message (this is so we block
         // but we will determine the cipher length before reading all
@@ -245,21 +255,20 @@ class TransportProtocolInputStream {
         if (cipher != null) {
             cipherlen = cipher.getBlockSize();
         } else {
-            cipherlen = 8;
+            cipherlen = DEFAULT_CIPHER_LENGTH;
         }
 
-        // Verify we have enough buffer size for the inital block
+        // Verify we have enough buffer size for the inital block,
+        // otherwise recreate "initial" so it's the right size
         if (initial.length != cipherlen) {
             // Create a temporary array for the new block size and copy
             byte[] tmp = new byte[cipherlen];
-
             System.arraycopy(initial, 0, tmp, 0, initial.length);
-
             // Now change the initial buffer to our new array
             initial = tmp;
         }
 
-        // Now read the rest of the first block of data if necersary
+        // Now read the rest of the first block of data if necessary
         int count = read;
 
         if (count < initial.length) {
@@ -280,12 +289,12 @@ class TransportProtocolInputStream {
         }
 
         // Save the initial data
-        message.write(initial);
+        messageBytes.write(initial);
 
         // Preview the message length
         msglen = (int) ByteArrayReader.readInt(initial, 0);
 
-        //if (log.isDebugEnabled()) log.debug("Start of message of length " + msglen);
+        if (log.isDebugEnabled()) log.debug("Start of message of length " + msglen);
         
         padlen = initial[4];
 
@@ -293,7 +302,7 @@ class TransportProtocolInputStream {
         remaining = (msglen - (cipherlen - 4));
 
         while (remaining > 0) {
-        	//if (log.isDebugEnabled()) log.debug("Reading rest of message, bytes left: " + remaining);
+        	if (log.isDebugEnabled()) log.debug("Reading rest of message, bytes left: " + remaining);
         	
             read = readBufferedData(data, 0,
                     (remaining < data.length)
@@ -302,21 +311,21 @@ class TransportProtocolInputStream {
             remaining -= read;
 
             // Decrypt the data and/or write it to the message
-            message.write((cipher == null) ? data
+            messageBytes.write((cipher == null) ? data
                                            : cipher.transform(data, 0, read),
                 0, read);
         }
-        //if (log.isDebugEnabled()) log.debug("Finished reading message");
+        if (log.isDebugEnabled()) log.debug("Finished reading message");
     
 
         synchronized (sequenceLock) {
             if (hmac != null) {
                 read = readBufferedData(data, 0, maclen);
 
-                message.write(data, 0, read);
+                messageBytes.write(data, 0, read);
 
                 // Verify the mac
-                if (!hmac.verify(sequenceNo, message.toByteArray())) {
+                if (!hmac.verify(sequenceNo, messageBytes.toByteArray())) {
                     throw new IOException("Corrupt Mac on input");
                 }
             }
@@ -329,11 +338,11 @@ class TransportProtocolInputStream {
             }
         }
 
-        bytesTransfered += message.size();
+        bytesTransfered += messageBytes.size();
 
-        byte[] msg = message.toByteArray();
+        byte[] msg = messageBytes.toByteArray();
 
-        // Uncompress the message payload if necersary
+        // Uncompress the message payload if necessary
         if (compression != null) {
             return compression.uncompress(msg, 5, (msglen + 4) - padlen - 5);
         }

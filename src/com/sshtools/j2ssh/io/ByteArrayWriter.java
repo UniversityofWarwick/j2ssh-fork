@@ -198,7 +198,7 @@ public class ByteArrayWriter extends ByteArrayOutputStream {
             // patch as of version 0.2.9
             // for UTF-8 length of string is not necessarily
             // equal to number of bytes
-            byte[] strBytes = str.getBytes();
+            byte[] strBytes = str.getBytes("UTF-8");
             writeInt(strBytes.length);
             write(strBytes);
         }

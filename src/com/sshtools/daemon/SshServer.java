@@ -59,7 +59,7 @@ public abstract class SshServer {
     private ServerSocket commandServerSocket;
 
     /**  */
-    protected List activeConnections = new Vector();
+    protected List<TransportProtocolServer> activeConnections = new LinkedList<TransportProtocolServer>();
     Thread thread;
 
     /**
@@ -144,15 +144,12 @@ public abstract class SshServer {
     }
 
     /**
- *
- *
- * @throws IOException
- */
+	 * Listen on the command socket which really just listens for a command to stop the server.
+	 */
     protected void startCommandSocket() throws IOException {
         try {
-            commandServerSocket = new ServerSocket(((ServerConfiguration) ConfigurationLoader.getConfiguration(
-                        ServerConfiguration.class)).getCommandPort(), 50,
-                    InetAddress.getLocalHost());
+        	int commandPort = ConfigurationLoader.getConfiguration(ServerConfiguration.class).getCommandPort();
+            commandServerSocket = new ServerSocket(commandPort, 50, InetAddress.getLocalHost());
 
             Socket client;
 
@@ -177,10 +174,9 @@ public abstract class SshServer {
     }
 
     /**
- *
- *
- * @throws IOException
- */
+	 *	The server socket is what listens for most of the data received, and handles
+	 *	messages.
+	 */
     protected void startServerSocket() throws IOException {
         listener = new ConnectionListener(((ServerConfiguration) ConfigurationLoader.getConfiguration(
                     ServerConfiguration.class)).getListenAddress(),
@@ -355,9 +351,8 @@ public abstract class SshServer {
                 // Closing all connections
                 log.info("Disconnecting active sessions");
 
-                for (Iterator it = activeConnections.iterator(); it.hasNext();) {
-                    ((TransportProtocolServer) it.next()).disconnect(
-                        "The server is shuting down");
+                for (TransportProtocolServer s : activeConnections) {
+                    s.disconnect("The server is shutting down");
                 }
 
                 listener = null;
@@ -368,8 +363,6 @@ public abstract class SshServer {
                 thread = null;
             }
 
-            // brett
-            //      System.exit(0);
         }
 
         public void start() {
@@ -386,8 +379,7 @@ public abstract class SshServer {
                     thread.interrupt();
                 }
             } catch (IOException ioe) {
-                log.warn("The listening socket reported an error during shutdown",
-                    ioe);
+                log.warn("The listening socket reported an error during shutdown", ioe);
             }
         }
     }

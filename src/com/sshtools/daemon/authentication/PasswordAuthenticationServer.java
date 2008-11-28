@@ -79,7 +79,7 @@ public class PasswordAuthenticationServer extends SshAuthenticationServer {
 
         if (authImpl == null) {
             log.error(
-                "Cannot perfrom authentication witout native authentication provider");
+                "Cannot perform authentication without native authentication provider");
 
             return AuthenticationProtocolState.FAILED;
         }

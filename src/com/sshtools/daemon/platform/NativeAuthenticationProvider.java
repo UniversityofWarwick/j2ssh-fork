@@ -142,15 +142,12 @@ public abstract class NativeAuthenticationProvider {
         if (instance == null) {
             try {
                 if (cls == null) {
-                    throw new IOException(
-                        "There is no authentication provider configured");
+                    throw new IOException("There is no authentication provider configured");
                 }
 
                 instance = (NativeAuthenticationProvider) cls.newInstance();
             } catch (Exception e) {
-                throw new IOException(
-                    "The authentication provider failed to initialize: " +
-                    e.getMessage());
+                throw new IOException("The authentication provider failed to initialize: ", e);
             }
         }
 

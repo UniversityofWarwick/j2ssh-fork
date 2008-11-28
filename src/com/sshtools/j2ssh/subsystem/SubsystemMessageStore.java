@@ -25,6 +25,7 @@
  */
 package com.sshtools.j2ssh.subsystem;
 
+import com.sshtools.j2ssh.io.ByteArrayWriter;
 import com.sshtools.j2ssh.transport.InvalidMessageException;
 import com.sshtools.j2ssh.transport.MessageNotAvailableException;
 import com.sshtools.j2ssh.transport.MessageStoreEOFException;
@@ -33,6 +34,7 @@ import com.sshtools.j2ssh.util.OpenClosedState;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -40,10 +42,10 @@ import java.util.Map;
 
 
 /**
- *
- *
- * @author $author$
- * @version $Revision: 1.28 $
+ * Stores messages. It is used for both incoming and outgoing messages,
+ * so it may be populated by data from a SubsystemOutputStream, or it
+ * can be populated and used by a SubsystemInputStream to read messages
+ * to serialize and send.
  */
 public class SubsystemMessageStore {
     private static Log log = LogFactory.getLog(SubsystemMessageStore.class);
@@ -74,10 +76,6 @@ public class SubsystemMessageStore {
      * @param msg
      */
     public synchronized void addMessage(SubsystemMessage msg) {
-        if (log.isDebugEnabled()) {
-            log.debug("Received " + msg.getMessageName() +
-                " subsystem message on " + name);
-        }
 
         // Add the message
         messages.add(msg);
@@ -148,11 +146,13 @@ public class SubsystemMessageStore {
 
         while (messages.size() <= 0) {
             try {
+            	//log.debug("SSMS "+name+" - Waiting");
                 wait(timeout);
 
                 if (timeout > 0) {
                     break;
                 }
+                //log.debug("SSMS "+name+" AWOKEN - " + messages.size());
             } catch (InterruptedException e) {
             }
         }
@@ -162,6 +162,7 @@ public class SubsystemMessageStore {
         }
 
         if (messages.size() > 0) {
+        	//log.debug("SSMS "+name+" Got message from store ");
             return (SubsystemMessage) messages.remove(0);
         } else {
             throw new MessageNotAvailableException();
@@ -176,6 +177,13 @@ public class SubsystemMessageStore {
      */
     public void registerMessage(int messageId, Class implementor) {
         registeredMessages.put(new Integer(messageId), implementor);
+    }
+    
+    /**
+     * @return The number of messages currently in the store.
+     */
+    public int size() {
+    	return messages.size();
     }
 
     /**

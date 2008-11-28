@@ -95,7 +95,7 @@ implements TransportProtocol, Runnable
     protected HostKeyVerification hosts;
 
     /**  */
-    protected Map kexs = new HashMap();
+    protected Map<String, SshKeyExchange> kexs = new HashMap<String, SshKeyExchange>();
     private boolean sendIgnore = false;
 
     //protected Map transportMessages = new HashMap();
@@ -136,7 +136,7 @@ implements TransportProtocol, Runnable
 
     /**  */
     protected byte[] signature = null;
-    private Vector eventHandlers = new Vector();
+    private Vector<TransportProtocolEventHandler> eventHandlers = new Vector<TransportProtocolEventHandler>();
 
     // Storage of messages whilst in key exchange
     private List messageStack = new ArrayList();
@@ -365,11 +365,8 @@ implements TransportProtocol, Runnable
             SshMsgNewKeys.class);
         registerTransportMessages();
         
-        List list = SshKeyExchangeFactory.getSupportedKeyExchanges();
-        Iterator it = list.iterator();
-        
-        while (it.hasNext()) {
-          String keyExchange = (String) it.next();
+        List<String> supportedKexs = SshKeyExchangeFactory.getSupportedKeyExchanges();
+        for (String keyExchange : supportedKexs) {
           SshKeyExchange kex = SshKeyExchangeFactory.newInstance(keyExchange);
           kex.init(this);
           kexs.put(keyExchange, kex);
@@ -942,7 +939,7 @@ implements TransportProtocol, Runnable
      *
      * @return
      */
-    protected List getEventHandlers() {
+    protected List<TransportProtocolEventHandler> getEventHandlers() {
         return eventHandlers;
     }
 

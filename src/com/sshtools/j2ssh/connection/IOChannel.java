@@ -138,7 +138,9 @@ public abstract class IOChannel extends Channel {
         // Synchronize on the message store to ensure that another thread
         // does not try to read its data. This will make sure that the incoming
         // messages are not being flushed to an outputstream after a bind
+    	//log.info("[IOChannel][onChannelData][pre-sync]");
         synchronized (incoming) {
+        	//log.info("[IOChannel][onChannelData][post-sync]");
             if (boundOutputStream != null) {
                 try {
                     boundOutputStream.write(msg.getChannelData());

@@ -112,6 +112,7 @@ public class TransportProtocolAlgorithmSync {
     public synchronized void lock() {
         while (isLocked) {
             try {
+            	//TODO is a timeout what we want here?
                 wait(50);
             } catch (InterruptedException e) {
             }
