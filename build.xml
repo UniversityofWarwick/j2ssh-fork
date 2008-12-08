@@ -154,12 +154,16 @@ communication over insecure networks.</p>]]></doctitle>
 <target name="quickstart">	
 	<java fork="true" classname="com.sshtools.daemon.SshDaemon">
 		<jvmarg value="-Dsshtools.home=conf/" />
-		<arg value="-start" />
+    <!-- 
+    uncomment to investigate log4j if it isn't finding its config file.
+    <jvmarg value="-Dlog4j.debug" /> -->
 		<classpath>
+      <pathelement path="." />
+			<pathelement path="conf" />
 			<fileset dir="dist/lib" includes="*.jar" />
 			<fileset dir="lib" includes="*.jar" />
-			<fileset dir="conf" includes="*" />
 		</classpath>
+    <arg value="-start" />
 	</java>
 </target>
 

@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE log4j:configuration SYSTEM "log4j.dtd">
+
+<!-- ===================================================================== -->
+<!--                                                                       -->
+<!--  Log4j Configuration                                                  -->
+<!--                                                                       -->
+<!-- ===================================================================== -->
+
+<!-- $Id: log4j.xml,v 1.3 2008/08/29 09:50:12 cusebr Exp $ -->
+
+<!--
+   | For more configuration infromation and examples see the Jakarta Log4j
+   | owebsite: http://jakarta.apache.org/log4j
+ -->
+
+
+<log4j:configuration xmlns:log4j="http://jakarta.apache.org/log4j/">
+
+	<appender name="FILE" class="org.apache.log4j.RollingFileAppender">
+		<param name="Threshold" value="debug"/>
+		<param name="DatePattern" value="'.'yyyy-MM-dd HH:mm"/>
+		<param name="MaxLogs" value="15"/>
+		<param name="File" value="logs/server.log"/> 
+	  	<layout class="org.apache.log4j.PatternLayout">
+	   		<param name="ConversionPattern" value="%d{ABSOLUTE} %-5p [%c] %m%n"/>
+ 		</layout>
+	</appender>
+
+	<category name="com.sshtools">
+      <level value="debug"/>
+    </category>
+
+	<category name="com.sshtools.daemon.subsystem.SubsystemServer">
+	  <level value="debug"/>
+    </category>
+	
+	<category name="org.springframework.transaction.aspectj">
+		<level value="info" />
+	</category>
+
+	<category name="org">
+		<level value="info"/>
+	</category>
+	
+	<category name="org.springframework">
+		<level value="info"/>
+	</category>
+	
+	<category name="net.sf">
+		<level value="info"/>
+	</category>
+	
+	<category name="org.springframework.jdbc">
+		<level value="info"/>
+	</category>
+	
+	<category name="org.apache.commons.pool">
+		<level value="info"/>
+	</category>
+	
+	<category name="org.apache.commons.dbcp">
+		<level value="info"/>
+	</category>
+	
+	<category name="org.hibernate">
+		<level value="info"/>
+	</category>
+	
+	<category name="org.hibernate.SQL">
+		<level value="info"/>
+	</category>
+	
+	<category name="org.apache.jasper">
+		<level value="info"/>
+	</category>
+
+	<root>
+      <level value="info"/>
+      <appender-ref ref="FILE" />
+	</root>
+	
+	
+  
+</log4j:configuration>
