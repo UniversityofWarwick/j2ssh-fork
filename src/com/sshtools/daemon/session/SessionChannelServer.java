@@ -75,6 +75,7 @@ public class SessionChannelServer extends IOChannel {
  */
     public SessionChannelServer() throws ConfigurationException {
         super();
+        log.info("Starting new SessionChannelServer");
 
         // Load the allowed subsystems from the server configuration
         config = (ServerConfiguration) ConfigurationLoader.getConfiguration(ServerConfiguration.class);
@@ -148,7 +149,7 @@ public class SessionChannelServer extends IOChannel {
  * @throws IOException
  */
     protected void onChannelExtData(byte[] data) throws IOException {
-        // Do something with the data
+        log.warn("ChannelExtData! Why aren't we doing anything with it?");
     }
 
     /**
@@ -157,6 +158,7 @@ public class SessionChannelServer extends IOChannel {
  * @throws InvalidChannelException
  */
     protected void onChannelOpen() throws InvalidChannelException {
+    	log.info("Opening channel");
         stderrOut = new ChannelOutputStream(this,
                 new Integer(SshMsgChannelExtendedData.SSH_EXTENDED_DATA_STDERR));
     }
@@ -383,7 +385,7 @@ public class SessionChannelServer extends IOChannel {
  * @return
  */
     protected int getMaximumWindowSpace() {
-        return 32648;
+        return 262144;
     }
 
     /**
