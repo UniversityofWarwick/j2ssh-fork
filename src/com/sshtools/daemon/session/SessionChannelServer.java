@@ -380,12 +380,11 @@ public class SessionChannelServer extends IOChannel {
     }
 
     /**
- *
- *
- * @return
- */
+    * Making this too small results in timeouts
+    * on some clients. 524288 should be plenty.
+    */
     protected int getMaximumWindowSpace() {
-        return 262144;
+        return 524288;
     }
 
     /**

@@ -1392,9 +1392,9 @@ implements TransportProtocol, Runnable
 
             while (!hasmsg) {
                 try {
-                	if (log.isDebugEnabled()) log.debug("Getting a message");
-                    msgdata = sshIn.readMessage();
-                    if (log.isDebugEnabled()) log.debug("Got a message");
+                	//if (log.isDebugEnabled()) log.debug("Getting a message");
+                    msgdata = sshIn.readMessage(); 
+                    //if (log.isDebugEnabled()) log.debug("Got a message");
                     hasmsg = true;
                 } catch (InterruptedIOException ex /*SocketTimeoutException ex*/) {
                     log.info("Possible timeout on transport inputstream");
@@ -1421,7 +1421,7 @@ implements TransportProtocol, Runnable
 	                	if (msg instanceof MessageRequestId) {
 	                		log.debug("Received " + msg.getMessageName() + ", ID=" + ((MessageRequestId)msg).getId().intValue());
 	                	} else {
-	                		log.debug("Received " + msg.getMessageName());
+	                		log.debug("Received message " + msg.getMessageName() + "("+msg.getClass().getSimpleName()+")");
 	                	}
                     }
 

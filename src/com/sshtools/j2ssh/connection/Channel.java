@@ -43,10 +43,10 @@ public abstract class Channel {
 	private static Log log = LogFactory.getLog(Channel.class);
 
 	/**  */
-	protected ChannelDataWindow localWindow = new ChannelDataWindow();
+	protected ChannelDataWindow localWindow = new ChannelDataWindow("local");
 
 	/**  */
-	protected ChannelDataWindow remoteWindow = new ChannelDataWindow();
+	protected ChannelDataWindow remoteWindow = new ChannelDataWindow("remote");
 
 	/**  */
 	protected ConnectionProtocol connection;

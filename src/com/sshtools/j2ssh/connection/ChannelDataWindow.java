@@ -38,11 +38,15 @@ import org.apache.commons.logging.LogFactory;
 public class ChannelDataWindow {
     private static Log log = LogFactory.getLog(ChannelDataWindow.class);
     long windowSpace = 0;
+    
+    String name;
 
     /**
      * Creates a new ChannelDataWindow object.
+     * name is used to identify it in logs.
      */
-    public ChannelDataWindow() {
+    public ChannelDataWindow(String name) {
+    	this.name = name;
     }
 
     /**
@@ -78,7 +82,7 @@ public class ChannelDataWindow {
      */
     public synchronized void increaseWindowSpace(long count) {
         if (log.isDebugEnabled()) {
-            log.debug("Increasing window space by " + String.valueOf(count));
+            log.debug(name+": Increasing window space by " + String.valueOf(count));
         }
 
         windowSpace += count;
@@ -92,7 +96,7 @@ public class ChannelDataWindow {
      */
     public synchronized void waitForWindowSpace(int minimum) {
         if (log.isDebugEnabled()) {
-            log.debug("Waiting for " + String.valueOf(minimum) +
+            log.debug(name+": Waiting for " + String.valueOf(minimum) +
                 " bytes of window space");
         }
 

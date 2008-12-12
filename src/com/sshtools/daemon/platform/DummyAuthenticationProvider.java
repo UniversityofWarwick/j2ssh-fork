@@ -2,6 +2,9 @@ package com.sshtools.daemon.platform;
 
 import java.io.IOException;
 
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+
 /**
  * This authentication provider provides no authentication at all,
  * and just lets anybody in so you should never use it! 
@@ -10,8 +13,10 @@ import java.io.IOException;
  */
 public class DummyAuthenticationProvider extends NativeAuthenticationProvider {
 
+	Log log = LogFactory.getLog(DummyAuthenticationProvider.class);
+	
 	public DummyAuthenticationProvider() {
-		System.err.println("WARNING: DummyAuthenticationProvider is in use. This is only for testing.");
+		log.error("DummyAuthenticationProvider is in use. This is only for testing.");
 	}
 	
 	@Override
