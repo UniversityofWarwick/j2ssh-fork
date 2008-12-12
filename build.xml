@@ -2,7 +2,7 @@
 <project name="sshtools" default="build" basedir=".">
 	<!-- Set global properties for this build -->
 	<property name="build.examples" value="./examples"/>
-	<property name="build.dist" value="./dist"/>
+	<property name="build.dist" value="./bin"/>
 	<property name="build.conf" value="./conf"/>
 	<property name="build.dist.classes" value="${build.dist}/classes"/>
 	<property name="build.dist.lib" value="${build.dist}/lib"/>
@@ -77,10 +77,10 @@
 	</target>
 
 	<target name="build" depends="compile, test">
-		<mkdir dir="${build.dist.lib}" />
+		<mkdir dir="dist/lib" />
 
 		<!-- Build the J2SSH library files -->
-		<jar jarfile="${build.dist.lib}/j2ssh-core-${j2ssh.version.major}.${j2ssh.version.minor}.${j2ssh.version.build}.jar" basedir="${build.dist.classes}">
+		<jar jarfile="dist/lib/j2ssh-core-${j2ssh.version.major}.${j2ssh.version.minor}.${j2ssh.version.build}.jar" basedir="${build.dist.classes}">
 			<include name="com/sshtools/j2ssh/**/*.class" />
 			<manifest>
 				<attribute name="Product-Version"
@@ -88,7 +88,7 @@
 			</manifest>
 		</jar>
 
-		<jar jarfile="${build.dist.lib}/j2ssh-ant-${j2ssh.version.major}.${j2ssh.version.minor}.${j2ssh.version.build}.jar" basedir="${build.dist.classes}">
+		<jar jarfile="dist/lib/j2ssh-ant-${j2ssh.version.major}.${j2ssh.version.minor}.${j2ssh.version.build}.jar" basedir="${build.dist.classes}">
 			<include name="com/sshtools/ant/**/*.class"/>
 			<manifest>
 				<attribute name="Product-Version"
@@ -96,7 +96,7 @@
 			</manifest>
 		</jar>
 
-		<jar jarfile="${build.dist.lib}/j2ssh-daemon-${j2ssh.version.major}.${j2ssh.version.minor}.${j2ssh.version.build}.jar" basedir="${build.dist.classes}">
+		<jar jarfile="dist/lib/j2ssh-daemon-${j2ssh.version.major}.${j2ssh.version.minor}.${j2ssh.version.build}.jar" basedir="${build.dist.classes}">
 			<include name="com/sshtools/daemon/**/*.class"/>
 			<exclude name="com/sshtools/daemon/windows/**/*.*"/>
 			<exclude name="com/sshtools/daemon/linux/**/*.*"/>
@@ -106,7 +106,7 @@
 			</manifest>
 		</jar>
 
-		<jar jarfile="${build.dist.lib}/j2ssh-common-${j2ssh.version.major}.${j2ssh.version.minor}.${j2ssh.version.build}.jar" basedir="${build.dist.classes}">
+		<jar jarfile="dist/lib/j2ssh-common-${j2ssh.version.major}.${j2ssh.version.minor}.${j2ssh.version.build}.jar" basedir="${build.dist.classes}">
 			<include name="com/sshtools/common/**/*.class"/>
 			<include name="com/sshtools/common/**/*.png"/>
 			<include name="com/sshtools/common/**/*.gif"/>
