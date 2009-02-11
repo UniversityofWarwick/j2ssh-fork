@@ -292,6 +292,7 @@ public class ChannelInputStream extends InputStream {
                     } catch (MessageNotAvailableException ex1) {
                         // Ignore the timeout but this allows us to review the
                         // InputStreams state once in a while
+                    	throw new MessageStoreEOFException();
                     }
                 }
 

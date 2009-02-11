@@ -94,6 +94,7 @@ public class Hash {
         try {
             baw.writeInt(i);
         } catch (IOException ioe) {
+        	throw new IllegalStateException(ioe);
         }
 
         hash.update(baw.toByteArray());

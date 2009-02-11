@@ -25,24 +25,30 @@
  */
 package com.sshtools.daemon;
 
-import com.sshtools.daemon.authentication.*;
-import com.sshtools.daemon.configuration.*;
-import com.sshtools.daemon.transport.*;
+import java.io.IOException;
+import java.net.InetAddress;
+import java.net.ServerSocket;
+import java.net.Socket;
+import java.util.LinkedList;
+import java.util.List;
 
-import com.sshtools.j2ssh.*;
-import com.sshtools.j2ssh.configuration.*;
-import com.sshtools.j2ssh.connection.*;
-import com.sshtools.j2ssh.net.*;
-import com.sshtools.j2ssh.transport.*;
-import com.sshtools.j2ssh.util.*;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 
-import org.apache.commons.logging.*;
-
-import java.io.*;
-
-import java.net.*;
-
-import java.util.*;
+import com.sshtools.daemon.authentication.AuthenticationProtocolServer;
+import com.sshtools.daemon.configuration.PlatformConfiguration;
+import com.sshtools.daemon.configuration.ServerConfiguration;
+import com.sshtools.daemon.transport.TransportProtocolServer;
+import com.sshtools.j2ssh.SshException;
+import com.sshtools.j2ssh.SshThread;
+import com.sshtools.j2ssh.configuration.ConfigurationLoader;
+import com.sshtools.j2ssh.configuration.SshConnectionProperties;
+import com.sshtools.j2ssh.connection.ConnectionProtocol;
+import com.sshtools.j2ssh.net.ConnectedSocketTransportProvider;
+import com.sshtools.j2ssh.transport.TransportProtocol;
+import com.sshtools.j2ssh.transport.TransportProtocolEventAdapter;
+import com.sshtools.j2ssh.transport.TransportProtocolEventHandler;
+import com.sshtools.j2ssh.util.StartStopState;
 
 
 /**
@@ -54,11 +60,13 @@ import java.util.*;
 public abstract class SshServer {
     private static Log log = LogFactory.getLog(SshServer.class);
     private ConnectionListener listener = null;
-    private ServerSocket server = null;
+    //private ServerSocket server = null;
     private boolean shutdown = false;
     private ServerSocket commandServerSocket;
+    
+    private boolean acceptingConnections = true;
 
-    /**  */
+	/**  */
     protected List<TransportProtocolServer> activeConnections = new LinkedList<TransportProtocolServer>();
     Thread thread;
 
@@ -91,16 +99,29 @@ public abstract class SshServer {
                 "Server cannot start because there are no server host keys available");
         }
     }
+    
+
+    public boolean isAcceptingConnections() {
+		return acceptingConnections;
+	}
 
     /**
- *
- *
- * @throws IOException
- */
+     * Default is true. If set to false, will refuse any new connections.
+     * This may be useful when you want to shut down the server gracefully
+     * by waiting for existing connections to end, without allowing new ones.
+     */
+	public void setAcceptingConnections(boolean acceptingConnections) {
+		this.acceptingConnections = acceptingConnections;
+		log.info("Accepting connections changed to: " + acceptingConnections);
+	}
+
+
     public void startServer() throws IOException {
         log.info("Starting server");
         shutdown = false;
         startServerSocket();
+        
+        
         thread = new Thread(new Runnable() {
                     public void run() {
                         try {
@@ -120,7 +141,6 @@ public abstract class SshServer {
         try {
             thread.join();
         } catch (InterruptedException e) {
-            // TODO Auto-generated catch block
             e.printStackTrace();
         }
     }
@@ -178,10 +198,11 @@ public abstract class SshServer {
 	 *	messages.
 	 */
     protected void startServerSocket() throws IOException {
-        listener = new ConnectionListener(((ServerConfiguration) ConfigurationLoader.getConfiguration(
-                    ServerConfiguration.class)).getListenAddress(),
-                ((ServerConfiguration) ConfigurationLoader.getConfiguration(
-                    ServerConfiguration.class)).getPort());
+        ServerConfiguration serverConfiguration = (ServerConfiguration) ConfigurationLoader.getConfiguration(
+		    ServerConfiguration.class);
+		InetAddress address = InetAddress.getByName(serverConfiguration.getListenAddress());
+		int port = serverConfiguration.getPort();
+		listener = new ConnectionListener(address, port);
         listener.start();
     }
 
@@ -256,8 +277,8 @@ public abstract class SshServer {
 
         /*( (InetSocketAddress) socket
      .getRemoteSocketAddress()).getAddress();*/
-        log.debug("Remote Hostname: " + address.getHostName());
-        log.debug("Remote IP: " + address.getHostAddress());
+        
+        log.debug("Remote Address: " + address.toString());
 
         TransportProtocolServer transport = new TransportProtocolServer();
 
@@ -284,22 +305,23 @@ public abstract class SshServer {
     class ConnectionListener implements Runnable {
         private Log log = LogFactory.getLog(ConnectionListener.class);
         private ServerSocket server;
-        private String listenAddress;
+        private InetAddress listenAddress;
         private Thread thread;
         private int maxConnections;
         private int port;
         private StartStopState state = new StartStopState(StartStopState.STOPPED);
 
-        public ConnectionListener(String listenAddress, int port) {
+        public ConnectionListener(InetAddress listenAddress, int port) {
             this.port = port;
             this.listenAddress = listenAddress;
         }
 
         public void run() {
             try {
-                log.debug("Starting connection listener thread");
+                log.debug("Starting connection listener thread on address " + listenAddress);
                 state.setValue(StartStopState.STARTED);
-                server = new ServerSocket(port);
+                
+                server = new ServerSocket(port, 0, listenAddress);
 
                 Socket socket;
                 maxConnections = ((ServerConfiguration) ConfigurationLoader.getConfiguration(ServerConfiguration.class)).getMaxConnections();
@@ -326,12 +348,12 @@ public abstract class SshServer {
                             (state.getValue() == StartStopState.STARTED)) {
                         log.debug("New connection requested");
 
-                        if (maxConnections < activeConnections.size()) {
+                        if (!isAcceptingConnections() || maxConnections < activeConnections.size()) {
                             refuseSession(socket);
                         } else {
                             TransportProtocolServer transport = createSession(socket);
                             log.info("Monitoring active session from " +
-                                socket.getInetAddress().getHostName());
+                                socket.getInetAddress().toString());
 
                             synchronized (activeConnections) {
                                 activeConnections.add(transport);
@@ -373,7 +395,12 @@ public abstract class SshServer {
         public void stop() {
             try {
                 state.setValue(StartStopState.STOPPED);
-                server.close();
+                
+                if (server != null) {
+                	server.close();
+                } else {
+                	log.debug("server was null. might be okay");
+                }
 
                 if (thread != null) {
                     thread.interrupt();

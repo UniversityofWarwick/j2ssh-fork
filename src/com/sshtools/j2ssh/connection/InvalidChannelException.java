@@ -35,7 +35,9 @@ import java.io.*;
  * @version $Revision: 1.15 $
  */
 public class InvalidChannelException extends IOException {
-    /**
+	private static final long serialVersionUID = 1L;
+
+	/**
      * Creates a new InvalidChannelException object.
      *
      * @param msg

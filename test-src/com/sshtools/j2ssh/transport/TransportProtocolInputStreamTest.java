@@ -9,7 +9,7 @@ import com.sshtools.j2ssh.transport.kex.SshKeyExchange;
 import junit.framework.TestCase;
 
 public class TransportProtocolInputStreamTest extends TestCase {
-	
+
 	public void testNothing() {
 		
 	}
@@ -162,7 +162,7 @@ public class TransportProtocolInputStreamTest extends TestCase {
 //			}
 //			
 //		};
-//		TransportProtocolInputStream tpis = new TransportProtocolInputStream(protocol, socket, null);
+//		TransportProtocolInputStream tpis = new TransportProtocolInputStream(null, socket, null);
 //		
 //		byte[] buf = new byte[1024];
 //		buf[50] = -10;

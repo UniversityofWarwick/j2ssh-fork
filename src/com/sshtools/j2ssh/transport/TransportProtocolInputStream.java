@@ -74,12 +74,6 @@ class TransportProtocolInputStream {
     private byte[] buffered = new byte[65535];
     private int startpos = 0;
     private int endpos = 0;
-	
-    // debug variables.
-    private boolean blocking;
-	private int readLoops;
-	private long totalEverRead;
-	private long totalEverWritten;
 
     /**
      * Creates a new TransportProtocolInputStream object.
@@ -105,8 +99,6 @@ class TransportProtocolInputStream {
 		 * then we'd see blocking=true with readLoops>1, indicating it had read in some
 		 * data and now was waiting. In this case some data would be stuck.
 		 */
-		log.info(String.format("[tpis][%d - %d][blocking=%b][readLoops=%d][read/writ=%d/%d]", startpos, endpos, blocking,readLoops, totalEverRead,totalEverWritten));
-	
     }
 
     /**
@@ -137,15 +129,8 @@ class TransportProtocolInputStream {
     }
 
     /**
-     *
-     *
-     * @param buf
-     * @param off
-     * @param len
-     *
-     * @return
-     *
-     * @throws IOException
+     * Grab raw encrypted bytes from the socket. Will block until
+     * it has len bytes and places them into buf.
      */
     protected int readBufferedData(byte[] buf, int off, int len)
         throws IOException {
@@ -154,8 +139,6 @@ class TransportProtocolInputStream {
     	//return in.read(buf,off,len);
     	
         int read;
-        
-        int totalRead = 0;
 
         //if we don't already have enough data...
         if ((endpos - startpos) < len) {
@@ -178,17 +161,13 @@ class TransportProtocolInputStream {
                 }
             }
 
-                    
-            readLoops = 0;
+                   
             // If there is not enough data then block and read until there is (if still connected)
             while (((endpos - startpos) < len) &&
                     (transport.getState().getValue() != TransportProtocolState.DISCONNECTED)) {
                 try {
-                	//log.info("[TPIS][pre-socket-read]");
-                	blocking = true;
+                	
                     read = in.read(buffered, endpos, (buffered.length - endpos));
-                    blocking = false;
-                    //log.info("[TPIS][post-socket-read]");
                 } catch (InterruptedIOException ex) { 
                     // We have an interrupted io; inform the event handler
                 	log.warn("Interrupted IO");
@@ -198,13 +177,11 @@ class TransportProtocolInputStream {
                     }
                 }
 
+                int bytesRead = read;
                 if (read < 0) {
-                    throw new IOException("The socket is EOF");
+                	throw new IOException("The socket is EOF");
                 }
-                readLoops++;
-                endpos += read;
-                totalRead += read;
-                totalEverRead += read;
+                endpos += bytesRead;
             }
             
            
@@ -215,8 +192,6 @@ class TransportProtocolInputStream {
         System.arraycopy(buffered, startpos, buf, off, len);
 
         startpos += len;
-        
-        totalEverWritten += len;
 
         // Try to reset the buffer
         if (startpos >= endpos) {
@@ -228,12 +203,8 @@ class TransportProtocolInputStream {
     }
 
     /**
-     *
-     *
-     * @return
-     *
-     * @throws SocketException
-     * @throws IOException
+     * Grabs enough raw bytes to make up a message, decrypts them,
+     * and returns them as the decrypted bytes of a single message.
      */
     public byte[] readMessage() throws SocketException, IOException {
         // Reset the message for the next

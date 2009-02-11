@@ -45,13 +45,16 @@ import java.util.*;
 
 
 /**
- *
- *
  * @author $author$
  * @version $Revision: 1.16 $
  */
 public class SessionChannelServer extends IOChannel {
-    private static Log log = LogFactory.getLog(SessionChannelServer.class);
+    private static final int MAXIMUM_PACKET_SIZE = 32648;
+
+	private static final int MINIMUM_WINDOW_SPACE = 1024;
+	private static final int MAXIMUM_WINDOW_SPACE = 524288 * 2; // 1 MiB
+
+	private static Log log = LogFactory.getLog(SessionChannelServer.class);
 
     /**  */
     public final static String SESSION_CHANNEL_TYPE = "session";
@@ -69,10 +72,10 @@ public class SessionChannelServer extends IOChannel {
     private ServerConfiguration config;
 
     /**
- * Creates a new SessionChannelServer object.
- *
- * @throws ConfigurationException
- */
+	 * Creates a new SessionChannelServer object.
+	 *
+	 * @throws ConfigurationException
+	 */
     public SessionChannelServer() throws ConfigurationException {
         super();
         log.info("Starting new SessionChannelServer");
@@ -376,7 +379,7 @@ public class SessionChannelServer extends IOChannel {
  * @return
  */
     protected int getMinimumWindowSpace() {
-        return 1024;
+        return MINIMUM_WINDOW_SPACE;
     }
 
     /**
@@ -384,7 +387,7 @@ public class SessionChannelServer extends IOChannel {
     * on some clients. 524288 should be plenty.
     */
     protected int getMaximumWindowSpace() {
-        return 524288;
+        return MAXIMUM_WINDOW_SPACE;
     }
 
     /**
@@ -393,7 +396,7 @@ public class SessionChannelServer extends IOChannel {
  * @return
  */
     protected int getMaximumPacketSize() {
-        return 32648;
+        return MAXIMUM_PACKET_SIZE;
     }
 
     /**
@@ -554,6 +557,7 @@ public class SessionChannelServer extends IOChannel {
         public ProcessMonitorThread(NativeProcessProvider process) {
             this.process = process;
             state = new StartStopState(StartStopState.STARTED);
+            setDaemon(true);
             start();
         }
 

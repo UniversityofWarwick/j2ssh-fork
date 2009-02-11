@@ -40,6 +40,7 @@ import com.sshtools.j2ssh.util.Hash;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 
+import java.io.EOFException;
 import java.io.IOException;
 import java.io.InterruptedIOException;
 
@@ -139,7 +140,7 @@ implements TransportProtocol, Runnable
     private Vector<TransportProtocolEventHandler> eventHandlers = new Vector<TransportProtocolEventHandler>();
 
     // Storage of messages whilst in key exchange
-    private List messageStack = new ArrayList();
+    private List<SshMessage> messageStack = new ArrayList<SshMessage>();
 
     // Message notification registry
     private Map messageNotifications = new HashMap();
@@ -177,7 +178,7 @@ implements TransportProtocol, Runnable
     private int remoteEOL = EOL_CRLF;
 
     //private Map registeredMessages = new HashMap();
-    private Vector messageStores = new Vector();
+    private Vector<SshMessageStore> messageStores = new Vector<SshMessageStore>();
 
     /**
      * Creates a new TransportProtocolCommon object.
@@ -378,21 +379,21 @@ implements TransportProtocol, Runnable
         // negotiate the protocol version
         negotiateVersion();
         startBinaryPacketProtocol();
-      } 
-      catch (Throwable e) {
+      } catch (EOFException eof) {
+    	log.info("EOFException thrown - closing connection.");
+      } catch (Throwable e) {
         if (e instanceof IOException) {
           state.setLastError((IOException) e);
         }
         
         if (state.getValue() != TransportProtocolState.DISCONNECTED) {
           log.error("The Transport Protocol thread failed", e);
-          
-          //log.info(e.getMessage());
           stop();
         }
-      } 
-      finally {
+      } finally {
         thread = null;
+        //http://sourceforge.net/tracker/index.php?func=detail&aid=870122&group_id=60894&atid=495562
+        state.setValue(TransportProtocolState.DISCONNECTED);
       }
       
       log.debug("The Transport Protocol has been stopped");
@@ -1064,11 +1065,7 @@ implements TransportProtocol, Runnable
 
         // 05/01/2003 moiz change begin:
         // all close all the registerd messageStores
-        SshMessageStore ms;
-
-        for (it = messageStores.iterator(); (it != null) && it.hasNext();) {
-            ms = (SshMessageStore) it.next();
-
+        for (SshMessageStore ms : messageStores){
             try {
                 ms.close();
             } catch (Exception e) {
@@ -1190,6 +1187,13 @@ implements TransportProtocol, Runnable
         int l = remoteVer.indexOf("-");
         int r = remoteVer.indexOf("-", l + 1);
 
+        // This can happen if a server just opens a connection and sends some nonsense
+        // at random. Stop them here rather than throw a confusing exception.
+        if (l < 0 || r < 0) {
+        	log.error("Remote machine sent unrecognised version string. Disconnecting.");
+        	throw new TransportProtocolException("Unrecognised version string sent by remote server");
+        }
+        
         // Call abstract method so the implementations can set the
         // correct member variable
         setRemoteIdent(remoteVer.trim());

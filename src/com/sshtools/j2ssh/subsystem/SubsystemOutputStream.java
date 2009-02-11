@@ -161,22 +161,9 @@ public class SubsystemOutputStream extends OutputStream {
 	                    messageStart);
 	            int messageType = buffer.toByteArray()[messageStart + LENGTH_BYTES];
 	            
-	            //oh dear... what's this
-	            // HACK HACK HACK HACK
-	            boolean writeHack = false && messageType == 6 && messageStart == 0;
-	            
-	            if (writeHack || messageLength + messageStart <= (buffer.size() - LENGTH_BYTES)) {
-	            	//LOG.debug("COMPLETED Message: "+messageLength+", messageStart:"+messageStart+", buffer:"+(buffer.size() - LENGTH_BYTES));
-	            	// HACK HACK HACK HACK
-	                if (writeHack) {
-	                    // HACK HACK HACK HACK
-	                	messageLength = buffer.size() - LENGTH_BYTES;  // HACK HACK HACK HACK
-	                	//LOG.info()
-	                }
+	            if (messageLength + messageStart <= (buffer.size() - LENGTH_BYTES)) {
 	            	
 	                byte[] msgdata = new byte[messageLength];
-	
-	                // HACK HACK HACK HACK
 	                
 	                // Process a message
 	                System.arraycopy(buffer.toByteArray(), messageStart + LENGTH_BYTES,

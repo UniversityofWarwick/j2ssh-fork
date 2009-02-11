@@ -117,6 +117,7 @@ public abstract class SubsystemServer implements Runnable {
             }
             log.debug("SubsystemServer finished");
         } catch (MessageStoreEOFException meof) {
+        	log.warn("EOF in message store", meof);
         }
 
         thread = null;

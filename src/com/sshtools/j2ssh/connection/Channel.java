@@ -25,13 +25,12 @@
  */
 package com.sshtools.j2ssh.connection;
 
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Collection;
+
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-
-import java.io.IOException;
-
-import java.util.Iterator;
-import java.util.Vector;
 
 /**
  * 
@@ -42,36 +41,24 @@ import java.util.Vector;
 public abstract class Channel {
 	private static Log log = LogFactory.getLog(Channel.class);
 
-	/**  */
 	protected ChannelDataWindow localWindow = new ChannelDataWindow("local");
-
-	/**  */
-	protected ChannelDataWindow remoteWindow = new ChannelDataWindow("remote");
-
-	/**  */
+	protected ChannelDataWindow remoteWindow = new ChannelDataWindow("remote", false);
 	protected ConnectionProtocol connection;
 
-	/**  */
 	protected long localChannelId;
-
-	/**  */
 	protected long localPacketSize;
-
-	/**  */
 	protected long remoteChannelId;
-
-	/**  */
 	protected long remotePacketSize;
 
 	/**  */
-	protected ChannelState state = new ChannelState();
+	protected final ChannelState state = new ChannelState();
 	private boolean isClosed = false;
 	private boolean isLocalEOF = false;
 	private boolean isRemoteEOF = false;
 	private boolean localHasClosed = false;
 	private boolean remoteHasClosed = false;
 	private String name = "Unnamed Channel";
-	private Vector eventListeners = new Vector();
+	private Collection<ChannelEventListener> eventListeners = new ArrayList<ChannelEventListener>();
 
 	/**
 	 * Creates a new Channel object.
@@ -140,49 +127,42 @@ public abstract class Channel {
 	 * 
 	 * @throws IOException
 	 */
-	protected void processChannelData(SshMsgChannelData msg) throws IOException {
-		synchronized (state) {
-			if (!isClosed()) {
-				if (msg.getChannelDataLength() > localWindow.getWindowSpace()) {
-					throw new IOException(
-							"More data recieved than is allowed by the channel data window ["
-									+ name + "]");
-				}
-
-				long windowSpace = localWindow.consumeWindowSpace(msg
-						.getChannelData().length);
-
-				if (windowSpace < getMinimumWindowSpace()) {
-					if (log.isDebugEnabled()) {
-						log.debug("Channel " + String.valueOf(localChannelId)
-								+ " requires more window space [" + name + "]");
-					}
-
-					windowSpace = getMaximumWindowSpace() - windowSpace;
-					log.debug("Requesting connection protocol increase window");
-					connection.sendChannelWindowAdjust(this, windowSpace);
-					localWindow.increaseWindowSpace(windowSpace);
-				}
-
-				onChannelData(msg);
-
-				Iterator it = eventListeners.iterator();
-				ChannelEventListener eventListener;
-
-				while (it.hasNext()) {
-					eventListener = (ChannelEventListener) it.next();
-
-					if (eventListener != null) {
-						eventListener
-								.onDataReceived(this, msg.getChannelData());
-					}
-				}
-			} else {
+	protected synchronized void processChannelData(SshMsgChannelData msg) throws IOException {
+		if (!isClosed()) {
+			if (msg.getChannelDataLength() > localWindow.getWindowSpace()) {
 				throw new IOException(
-						"Channel data received but channel is closed [" + name
-								+ "]");
+						"More data recieved than is allowed by the channel data window ["
+								+ name + "]");
 			}
+
+			long windowSpace = localWindow.consumeWindowSpace(msg
+					.getChannelData().length);
+
+			if (windowSpace < getMinimumWindowSpace()) {
+				if (log.isDebugEnabled()) {
+					log.debug("Channel " + String.valueOf(localChannelId)
+							+ " requires more window space [" + name + "]");
+				}
+
+				windowSpace = getMaximumWindowSpace() - windowSpace;
+				log.debug("Requesting connection protocol increase window");
+				connection.sendChannelWindowAdjust(this, windowSpace);
+				localWindow.increaseWindowSpace(windowSpace);
+			}
+
+			onChannelData(msg);
+
+			for (ChannelEventListener eventListener : eventListeners) {
+				if (eventListener != null) {
+					eventListener.onDataReceived(this, msg.getChannelData());
+				}
+			}
+		} else {
+			throw new IOException(
+					"Channel data received but channel is closed [" + name
+							+ "]");
 		}
+		
 	}
 
 	/**
@@ -190,10 +170,8 @@ public abstract class Channel {
 	 * 
 	 * @return
 	 */
-	public boolean isClosed() {
-		synchronized (state) {
-			return state.getValue() == ChannelState.CHANNEL_CLOSED;
-		}
+	public synchronized boolean isClosed() {
+		return state.getValue() == ChannelState.CHANNEL_CLOSED;
 	}
 
 	/**
@@ -201,10 +179,8 @@ public abstract class Channel {
 	 * 
 	 * @return
 	 */
-	public boolean isOpen() {
-		synchronized (state) {
-			return state.getValue() == ChannelState.CHANNEL_OPEN;
-		}
+	public synchronized boolean isOpen() {
+		return state.getValue() == ChannelState.CHANNEL_OPEN;
 	}
 
 	/**
@@ -224,12 +200,7 @@ public abstract class Channel {
 		if (!isClosed()) {
 			connection.sendChannelData(this, data);
 
-			Iterator it = eventListeners.iterator();
-			ChannelEventListener eventListener;
-
-			while (it.hasNext()) {
-				eventListener = (ChannelEventListener) it.next();
-
+			for (ChannelEventListener eventListener : eventListeners) {
 				if (eventListener != null) {
 					eventListener.onDataSent(this, data);
 				}
@@ -257,12 +228,7 @@ public abstract class Channel {
 		if (!isClosed()) {
 			connection.sendChannelExtData(this, type, data);
 
-			Iterator it = eventListeners.iterator();
-			ChannelEventListener eventListener;
-
-			while (it.hasNext()) {
-				eventListener = (ChannelEventListener) it.next();
-
+			for (ChannelEventListener eventListener : eventListeners) {
 				if (eventListener != null) {
 					eventListener.onDataSent(this, data);
 				}
@@ -314,12 +280,7 @@ public abstract class Channel {
 
 			onChannelExtData(msg);
 
-			Iterator it = eventListeners.iterator();
-			ChannelEventListener eventListener;
-
-			while (it.hasNext()) {
-				eventListener = (ChannelEventListener) it.next();
-
+			for (ChannelEventListener eventListener : eventListeners) {
 				if (eventListener != null) {
 					eventListener.onDataReceived(this, msg.getChannelData());
 				}
@@ -414,7 +375,7 @@ public abstract class Channel {
 
 				if (remoteHasClosed
 						|| ((connection == null) || !connection.isConnected())) {
-					log.info("Finializing channel close");
+					log.info("Finalizing channel close");
 					finalizeClose();
 				}
 			}
@@ -444,13 +405,8 @@ public abstract class Channel {
 		synchronized (state) {
 			state.setValue(ChannelState.CHANNEL_CLOSED);
 			onChannelClose();
-
-			Iterator it = eventListeners.iterator();
-			ChannelEventListener eventListener;
-
-			while (it.hasNext()) {
-				eventListener = (ChannelEventListener) it.next();
-
+			
+			for (ChannelEventListener eventListener : eventListeners) {
 				if (eventListener != null) {
 					eventListener.onChannelClose(this);
 				}
@@ -502,12 +458,7 @@ public abstract class Channel {
 			isRemoteEOF = true;
 			onChannelEOF();
 
-			Iterator it = eventListeners.iterator();
-			ChannelEventListener eventListener;
-
-			while (it.hasNext()) {
-				eventListener = (ChannelEventListener) it.next();
-
+			for (ChannelEventListener eventListener : eventListeners) {
 				if (eventListener != null) {
 					eventListener.onChannelEOF(this);
 				}
@@ -521,7 +472,9 @@ public abstract class Channel {
 	 * @param eventListener
 	 */
 	public void addEventListener(ChannelEventListener eventListener) {
-		eventListeners.add(eventListener);
+		synchronized(state) {
+			eventListeners.add(eventListener);
+		}
 	}
 
 	/**
@@ -559,12 +512,7 @@ public abstract class Channel {
 			state.setValue(ChannelState.CHANNEL_OPEN);
 			onChannelOpen();
 
-			Iterator it = eventListeners.iterator();
-			ChannelEventListener eventListener;
-
-			while (it.hasNext()) {
-				eventListener = (ChannelEventListener) it.next();
-
+			for (ChannelEventListener eventListener : eventListeners) {
 				if (eventListener != null) {
 					eventListener.onChannelOpen(this);
 				}

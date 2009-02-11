@@ -40,6 +40,8 @@ public class ChannelDataWindow {
     long windowSpace = 0;
     
     String name;
+    
+    private boolean actuallyWait = true;
 
     /**
      * Creates a new ChannelDataWindow object.
@@ -47,6 +49,17 @@ public class ChannelDataWindow {
      */
     public ChannelDataWindow(String name) {
     	this.name = name;
+    }
+    
+    /**
+     * Create a data window, specifying what to do when all the
+     * window space is consume. If waitForSpace is false, it will
+     * allow the size of the window to drop below zero - it will
+     * simply carry on rather than block.
+     */
+    public ChannelDataWindow(String name, boolean waitForSpace) {
+    	this(name);
+    	actuallyWait = waitForSpace;
     }
 
     /**
@@ -67,7 +80,14 @@ public class ChannelDataWindow {
      */
     public synchronized long consumeWindowSpace(int count) {
         if (windowSpace < count) {
-            waitForWindowSpace(count);
+        	if (actuallyWait) {
+        		waitForWindowSpace(count);
+        	} else {
+        		if (log.isInfoEnabled()) {
+	        		log.info(name+": NOT waiting for " + String.valueOf(count) +
+	                        " bytes of window space");
+        		}
+        	}
         }
 
         windowSpace -= count;

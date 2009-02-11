@@ -34,7 +34,7 @@ import java.io.Serializable;
  * @author $author$
  * @version $Revision: 1.18 $
  */
-public abstract class State implements Serializable {
+public abstract class State {
     /**  */
     protected int state;
 

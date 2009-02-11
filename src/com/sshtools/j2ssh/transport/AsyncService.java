@@ -98,39 +98,42 @@ public abstract class AsyncService extends Service implements Runnable {
 
         SshMessage msg = null;
 
-        while ((state.getValue() == ServiceState.SERVICE_STARTED) &&
-                transport.isConnected()) {
-            try {
-                // Get the next message from the message store
-                msg = messageStore.getMessage(messageFilter);
-
-                if (state.getValue() == ServiceState.SERVICE_STOPPED) {
-                    break;
-                }
-
-                if (log.isDebugEnabled()) {
-                    log.debug("Routing " + msg.getMessageName());
-                }
-
-                onMessageReceived(msg);
-
-                if (log.isDebugEnabled()) {
-                    log.debug("Finished processing " + msg.getMessageName());
-                }
-            } catch (MessageStoreEOFException eof) {
-                stop();
-            } catch (Exception ex) {
-                if ((state.getValue() != ServiceState.SERVICE_STOPPED) &&
-                        transport.isConnected()) {
-                    log.fatal("Service message loop failed!", ex);
-                    stop();
-                }
-            }
+        try {
+	        while ((state.getValue() == ServiceState.SERVICE_STARTED) &&
+	                transport.isConnected()) {
+	            try {
+	                // Get the next message from the message store
+	                msg = messageStore.getMessage(messageFilter);
+	
+	                if (state.getValue() == ServiceState.SERVICE_STOPPED) {
+	                    break;
+	                }
+	
+	                if (log.isDebugEnabled()) {
+	                    log.debug("Routing " + msg.getMessageName());
+	                }
+	
+	                onMessageReceived(msg);
+	
+	                if (log.isDebugEnabled()) {
+	                    log.debug("Finished processing " + msg.getMessageName());
+	                }
+	            } catch (MessageStoreEOFException eof) {
+	            	if (log.isDebugEnabled()) log.debug("MessageStoreEOF exception");
+	                stop();
+	            } catch (Exception ex) {
+	                if ((state.getValue() != ServiceState.SERVICE_STOPPED) &&
+	                        transport.isConnected()) {
+	                    log.fatal("Service message loop failed!", ex);
+	                    stop();
+	                }
+	            }
+	        }
+        } finally { 
+	        onStop();
+	        log.info(getServiceName() + " thread is exiting");
+	        thread = null;
         }
-
-        onStop();
-        log.info(getServiceName() + " thread is exiting");
-        thread = null;
     }
 
     /**

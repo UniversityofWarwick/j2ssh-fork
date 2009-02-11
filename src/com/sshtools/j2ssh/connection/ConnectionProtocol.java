@@ -25,23 +25,22 @@
  */
 package com.sshtools.j2ssh.connection;
 
+import java.io.IOException;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+
 import com.sshtools.j2ssh.SshException;
 import com.sshtools.j2ssh.transport.AsyncService;
 import com.sshtools.j2ssh.transport.MessageStoreEOFException;
 import com.sshtools.j2ssh.transport.ServiceState;
 import com.sshtools.j2ssh.transport.SshMessage;
 import com.sshtools.j2ssh.transport.TransportProtocolState;
-
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
-
-import java.io.IOException;
-
-import java.util.HashMap;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.Map;
 
 
 /**
@@ -52,10 +51,10 @@ import java.util.Map;
  */
 public class ConnectionProtocol extends AsyncService {
     private static Log log = LogFactory.getLog(ConnectionProtocol.class);
-    private HashSet reusableChannels = new HashSet();
-    private Map activeChannels = new ConcurrentHashMap();
-    private Map allowedChannels = new HashMap();
-    private Map globalRequests = new HashMap();
+    private Set<Long> reusableChannels = new HashSet<Long>();
+    private Map<Long,Channel> activeChannels = new ConcurrentHashMap<Long,Channel>();
+    private Map<String,ChannelFactory> allowedChannels = new HashMap<String,ChannelFactory>();
+    private Map<String,GlobalRequestHandler> globalRequests = new HashMap<String, GlobalRequestHandler>();
     private long nextChannelId = 0;
 
     /**
@@ -210,20 +209,14 @@ public class ConnectionProtocol extends AsyncService {
      */
     protected synchronized void onStop() {
         log.info("Closing all active channels");
-	//	synchronized (activeChannels) {
 		log.info("thread has "+activeChannels.values().size()+" active channels to stop");
         try {
-            Channel channel;
-
-            for (Iterator x = activeChannels.values().iterator(); x.hasNext();) {
-                channel = (Channel) x.next();
-
+            for (Channel channel : activeChannels.values()) {
                 if (channel != null) {
                     if (log.isDebugEnabled()) {
                         log.debug("Closing " + channel.getName() + " id=" +
                             String.valueOf(channel.getLocalChannelId()));
                     }
-
                     channel.close();
                 }
             }
@@ -232,7 +225,6 @@ public class ConnectionProtocol extends AsyncService {
         }
 
         activeChannels.clear();
-	//	}
     }
 
     /**
@@ -318,8 +310,15 @@ public class ConnectionProtocol extends AsyncService {
      */
     public synchronized void sendChannelExtData(Channel channel,
         int extendedType, byte[] data) throws IOException {
+    	
+    	if (log.isDebugEnabled()) {
+            log.debug("Sending EXTENDED EDITION! " + String.valueOf(data.length) +
+                " bytes for channel id " +
+                String.valueOf(channel.getLocalChannelId()));
+        }
+    	
         channel.getRemoteWindow().consumeWindowSpace(data.length);
-
+        
         int sent = 0;
         int block;
         int remaining;
@@ -470,7 +469,6 @@ public class ConnectionProtocol extends AsyncService {
      */
     public synchronized byte[] sendGlobalRequest(String requestName,
         boolean wantReply, byte[] requestData) throws IOException {
-        boolean success = true;
         SshMsgGlobalRequest msg = new SshMsgGlobalRequest(requestName, true,
                 requestData);
         transport.sendMessage(msg, this);
@@ -487,16 +485,16 @@ public class ConnectionProtocol extends AsyncService {
                 SshMessage reply = messageStore.getMessage(messageIdFilter);
 
                 switch (reply.getMessageId()) {
-                case SshMsgRequestSuccess.SSH_MSG_REQUEST_SUCCESS: {
-                    log.debug("Global request succeeded");
-
-                    return ((SshMsgRequestSuccess) reply).getRequestData();
-                }
+	                case SshMsgRequestSuccess.SSH_MSG_REQUEST_SUCCESS: {
+	                    log.debug("Global request succeeded");
+	
+	                    return ((SshMsgRequestSuccess) reply).getRequestData();
+	                }
 
                 case SshMsgRequestFailure.SSH_MSG_REQUEST_FAILURE: {
-                    log.debug("Global request failed");
-                    throw new SshException("The request failed");
-                }
+	                    log.debug("Global request failed");
+	                    throw new SshException("The request failed");
+	                }
                 }
             } catch (InterruptedException ex) {
                 throw new SshException(
@@ -760,15 +758,13 @@ public class ConnectionProtocol extends AsyncService {
     }
 
     private Channel getChannel(long channelId) throws IOException {
-        //synchronized (activeChannels) {
-            Long l = new Long(channelId);
+        Long l = new Long(channelId);
 
-            if (!activeChannels.containsKey(l)) {
-                throw new IOException("Non existent channel " + l.toString() +
-                    " requested");
-            }
-			return (Channel) activeChannels.get(l);
-        //}
+        if (!activeChannels.containsKey(l)) {
+            throw new IOException("Non existent channel " + l.toString() +
+                " requested");
+        }
+		return (Channel) activeChannels.get(l);
     }
 
     private void onMsgChannelClose(SshMsgChannelClose msg)
@@ -927,15 +923,11 @@ public class ConnectionProtocol extends AsyncService {
      * @param channel
      */
     protected void freeChannel(Channel channel) {
-        //synchronized (activeChannels) {
-            log.info("Freeing channel " +
-                String.valueOf(channel.getLocalChannelId()) + " [" +
-                channel.getName() + "]");
+        log.info("Freeing channel " +
+            String.valueOf(channel.getLocalChannelId()) + " [" +
+            channel.getName() + "]");
 
-            Long channelId = new Long(channel.getLocalChannelId());
-            activeChannels.remove(channelId);
-
-            //reusableChannels.add(channelId);
-        //}
+        Long channelId = new Long(channel.getLocalChannelId());
+        activeChannels.remove(channelId);
     }
 }
