@@ -31,6 +31,9 @@ import java.io.OutputStream;
 
 import java.net.Socket;
 
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+
 
 /**
  *
@@ -40,6 +43,8 @@ import java.net.Socket;
  */
 public class ConnectedSocketTransportProvider implements TransportProvider {
     Socket socket;
+    
+    public static final Log log = LogFactory.getLog(ConnectedSocketTransportProvider.class);
 
     /**
      * Creates a new ConnectedSocketTransportProvider object.
@@ -56,6 +61,7 @@ public class ConnectedSocketTransportProvider implements TransportProvider {
      * @throws IOException
      */
     public void close() throws IOException {
+    	log.debug("closing socket");
         socket.close();
     }
 

@@ -49,9 +49,9 @@ import java.util.*;
  * @version $Revision: 1.16 $
  */
 public class SessionChannelServer extends IOChannel {
-    private static final int MAXIMUM_PACKET_SIZE = 32648;
+    private static final int MAXIMUM_PACKET_SIZE = 32648 * 2;
 
-	private static final int MINIMUM_WINDOW_SPACE = 1024;
+	private static final int MINIMUM_WINDOW_SPACE = 1024 * 16; // 16 KiB
 	private static final int MAXIMUM_WINDOW_SPACE = 524288 * 2; // 1 MiB
 
 	private static Log log = LogFactory.getLog(SessionChannelServer.class);

@@ -34,10 +34,9 @@ import org.apache.commons.logging.LogFactory;
 
 
 /**
- *
- *
- * @author $author$
- * @version $Revision: 1.18 $
+ * Collects all of the algorithms into one class which can be locked for use.
+ * Any further threads that call lock() will block until the original thread
+ * calls release()
  */
 public class TransportProtocolAlgorithmSync {
     private static Log log = LogFactory.getLog(TransportProtocolAlgorithmSync.class);
@@ -107,25 +106,25 @@ public class TransportProtocolAlgorithmSync {
     }
 
     /**
-     *
+     * Call lock() before using the algorithms. Another thread will get caught
+     * in the wait() until release() is called.
      */
     public synchronized void lock() {
         while (isLocked) {
             try {
-            	//TODO is a timeout what we want here?
-                wait(50);
-            } catch (InterruptedException e) {
-            }
+                wait();
+            } catch (InterruptedException e) {}
         }
-
         isLocked = true;
     }
 
     /**
-     *
+     * Must always be called after lock() so that the algorithms can be used
+     * again.
      */
     public synchronized void release() {
         isLocked = false;
-        notifyAll();
+        // notify one thread that it can obtain the lock.
+        notify();
     }
 }

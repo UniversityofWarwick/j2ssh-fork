@@ -25,20 +25,19 @@
  */
 package com.sshtools.daemon.authentication;
 
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+
 import com.sshtools.j2ssh.configuration.ConfigurationException;
 import com.sshtools.j2ssh.configuration.ConfigurationLoader;
 import com.sshtools.j2ssh.configuration.ExtensionAlgorithm;
 import com.sshtools.j2ssh.configuration.SshAPIConfiguration;
 import com.sshtools.j2ssh.transport.AlgorithmNotSupportedException;
-
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
-
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
 
 
 /**
@@ -48,7 +47,7 @@ import java.util.Map;
  * @version $Revision: 1.10 $
  */
 public class SshAuthenticationServerFactory {
-    private static Map auths;
+    private static Map<String, Class<? extends SshAuthenticationServer>> auths;
     private static Log log = LogFactory.getLog(SshAuthenticationServerFactory.class);
 
     /**  */
@@ -61,7 +60,7 @@ public class SshAuthenticationServerFactory {
     public final static String AUTH_KBI = "keyboard-interactive";
 
     static {
-        auths = new HashMap();
+        auths = new HashMap<String, Class<? extends SshAuthenticationServer>>();
         log.info("Loading supported authentication methods");
         auths.put(AUTH_PASSWORD, PasswordAuthenticationServer.class);
         auths.put(AUTH_PK, PublicKeyAuthenticationServer.class);
@@ -71,12 +70,10 @@ public class SshAuthenticationServerFactory {
             if (ConfigurationLoader.isConfigurationAvailable(
                         SshAPIConfiguration.class)) {
                 SshAPIConfiguration config = (SshAPIConfiguration) ConfigurationLoader.getConfiguration(SshAPIConfiguration.class);
-                List addons = config.getAuthenticationExtensions();
-                Iterator it = addons.iterator();
 
                 // Add the methods to our supported list
-                while (it.hasNext()) {
-                    ExtensionAlgorithm method = (ExtensionAlgorithm) it.next();
+                for (ExtensionAlgorithm method : config.getAuthenticationExtensions()) {
+                
                     String name = method.getAlgorithmName();
 
                     if (auths.containsKey(name)) {
@@ -123,9 +120,9 @@ public class SshAuthenticationServerFactory {
  *
  * @return
  */
-    public static List getSupportedMethods() {
+    public static List<String> getSupportedMethods() {
         // Get the list of ciphers
-        ArrayList list = new ArrayList(auths.keySet());
+        List<String> list = new ArrayList<String>(auths.keySet());
 
         // Return the list
         return list;

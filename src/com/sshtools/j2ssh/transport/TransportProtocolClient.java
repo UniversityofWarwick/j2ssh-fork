@@ -133,7 +133,7 @@ public class TransportProtocolClient extends TransportProtocolCommon {
         try {
             // Wait for the accept message, if the service is not accepted the
             // transport protocol disconencts which should cause an excpetion
-            msg = ms.getMessage(SshMsgServiceAccept.SSH_MSG_SERVICE_ACCEPT);
+            msg = ms.popMessage(SshMsgServiceAccept.SSH_MSG_SERVICE_ACCEPT);
         } catch (InterruptedException ex) {
             throw new SshException(
                 "The thread was interrupted whilst waiting for a transport protocol message");

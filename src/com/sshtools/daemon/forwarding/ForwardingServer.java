@@ -62,7 +62,7 @@ public class ForwardingServer implements ChannelFactory, GlobalRequestHandler {
     private ConnectionProtocol connection;
     private List channelTypes = new Vector();
     private List localForwardings = new Vector();
-    private List remoteForwardings = new Vector();
+    private List remoteForwardings = new Vector(); 
 
     /**
  * Creates a new ForwardingServer object.

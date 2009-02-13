@@ -82,8 +82,8 @@ implements TransportProtocol, Runnable
     public static final String PROTOCOL_VERSION = "2.0";
 
     /**  */
-    public static String SOFTWARE_VERSION_COMMENTS = "http://www.sshtools.com " +
-        ConfigurationLoader.getVersionString("J2SSH", "j2ssh.properties");
+    public static String SOFTWARE_VERSION_COMMENTS = "Warwick J2SSH Fork/1.0";
+    
     private int threadNo = nextThreadNo++;
 
     /**  */
@@ -415,7 +415,7 @@ implements TransportProtocol, Runnable
         // exchange message
         if (log.isDebugEnabled()) {
         	if (msg instanceof MessageRequestId) {
-        		log.debug("Sending " + msg.getMessageName() + ", ID=" + ((MessageRequestId)msg).getId().intValue());
+        		log.debug("Sending " + msg.getMessageName() + ((MessageRequestId)msg).getId());
         	} else {
         		log.debug("Sending " + msg.getMessageName());
         	}
@@ -426,7 +426,9 @@ implements TransportProtocol, Runnable
         if (sender instanceof SshKeyExchange ||
                 sender instanceof TransportProtocolCommon ||
                 (currentState == TransportProtocolState.CONNECTED)) {
+        	log.debug("Posting message to output stream");
             sshOut.sendMessage(msg);
+            log.debug("Posted message to output stream");
 
             if (currentState == TransportProtocolState.CONNECTED) {
                 if (sendIgnore) {
@@ -1078,6 +1080,7 @@ implements TransportProtocol, Runnable
         messageStore = null;
 
         try {
+        	log.info("Closing transport provider");
             provider.close();
         } catch (IOException ioe) {
         }
@@ -1292,12 +1295,10 @@ implements TransportProtocol, Runnable
         SshMessage msg;
 
         while (state.getValue() != TransportProtocolState.DISCONNECTED) {
-            boolean hasmsg = false;
-
-            while (!hasmsg) {
-                msgdata = sshIn.readMessage();
-                hasmsg = true;
-            }
+            
+        	if (log.isDebugEnabled()) log.debug("Getting message from input stream");
+            msgdata = sshIn.readMessage();
+            if (log.isDebugEnabled()) log.debug("Got message from input stream");
 
             Integer messageId = SshMessage.getMessageId(msgdata);
 
@@ -1360,11 +1361,7 @@ implements TransportProtocol, Runnable
     }
 
     /**
-     *
-     *
-     * @return
-     *
-     * @throws IOException
+     * Process incoming messages
      */
     protected SshMessage processMessages() throws IOException {
         byte[] msgdata = null;
@@ -1380,14 +1377,11 @@ implements TransportProtocol, Runnable
             long kbLimit = transferredKB - lastTriggeredKB; 
             
             if (((currentTime - startTime) > kexTimeout) ||
-                (kbLimit > kexTransferLimitKB) ) 
-            {
-                //    ((sshIn.getNumBytesTransfered() +
-                //    sshOut.getNumBytesTransfered()) > kexTransferLimit)) {
+                (kbLimit > kexTransferLimitKB) ) {
               startTime     = currentTime;
               lastTriggeredKB = transferredKB;
               if (log.isDebugEnabled()) {
-                log.info("rekey");
+                log.debug("rekey");
               }
               sendKeyExchangeInit();
             }
@@ -1396,20 +1390,12 @@ implements TransportProtocol, Runnable
 
             while (!hasmsg) {
                 try {
-                	//if (log.isDebugEnabled()) log.debug("Getting a message");
-                    msgdata = sshIn.readMessage(); 
-                    //if (log.isDebugEnabled()) log.debug("Got a message");
+                    msgdata = sshIn.readMessage();
                     hasmsg = true;
                 } catch (InterruptedIOException ex /*SocketTimeoutException ex*/) {
                     log.info("Possible timeout on transport inputstream");
-
-                    Iterator it = eventHandlers.iterator();
-                    TransportProtocolEventHandler eventHandler;
-                    
-                    while (it.hasNext()) {
-                        eventHandler = (TransportProtocolEventHandler) it.next();
-                        eventHandler.onSocketTimeout(this /*,
-                        provider.isConnected()*/);
+                    for (TransportProtocolEventHandler eventHandler : eventHandlers) {
+                        eventHandler.onSocketTimeout(this);
                     }
                 }
             }
@@ -1456,19 +1442,12 @@ implements TransportProtocol, Runnable
         messageStores.add(store);
     }
 
-    private SshMessageStore getMessageStore(Integer messageId)
-        throws MessageNotRegisteredException {
-        SshMessageStore ms;
-
-        for (Iterator it = messageStores.iterator();
-                (it != null) && it.hasNext();) {
-            ms = (SshMessageStore) it.next();
-
+    private SshMessageStore getMessageStore(Integer messageId) throws MessageNotRegisteredException {
+        for (SshMessageStore ms : messageStores) {
             if (ms.isRegisteredMessage(messageId)) {
                 return ms;
             }
         }
-
         throw new MessageNotRegisteredException(messageId);
     }
 

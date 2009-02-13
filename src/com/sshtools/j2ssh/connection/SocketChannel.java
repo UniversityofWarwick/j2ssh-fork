@@ -38,10 +38,8 @@ import java.net.SocketException;
 
 
 /**
- *
- *
- * @author $author$
- * @version $Revision: 1.14 $
+ * This is unrelated to the java.nio.SocketChannel, which is the NIO
+ * implementation of sockets. This is an SSH Channel bound to a socket.
  */
 public abstract class SocketChannel extends Channel {
     private static Log log = LogFactory.getLog(SocketChannel.class);

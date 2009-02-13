@@ -52,8 +52,8 @@ public class ServerConfiguration extends DefaultHandler {
     private static Log log = LogFactory.getLog(ServerConfiguration.class);
     private Map allowedSubsystems = new HashMap();
     private Map serverHostKeys = new HashMap();
-    private List allowedAuthentications = new ArrayList();
-    private List requiredAuthentications = new ArrayList();
+    private List<String> allowedAuthentications = new ArrayList<String>();
+    private List<String> requiredAuthentications = new ArrayList<String>();
     private int commandPort = 12222;
     private int port = 22;
     private String listenAddress = "0.0.0.0";
@@ -315,7 +315,7 @@ public class ServerConfiguration extends DefaultHandler {
  *
  * @return
  */
-    public List getAllowedAuthentications() {
+    public List<String> getAllowedAuthentications() {
         return allowedAuthentications;
     }
 

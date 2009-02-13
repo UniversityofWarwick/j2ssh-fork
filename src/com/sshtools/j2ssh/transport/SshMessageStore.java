@@ -54,7 +54,7 @@ public final class SshMessageStore {
 
     // List to hold messages as they are received
     private List messages = new ArrayList();
-    private Map register = new HashMap();
+    private Map<Integer,Class<SshMessage>> register = new HashMap<Integer,Class<SshMessage>>();
     private boolean isClosed = false;
     private int[] singleIdFilter = new int[1];
     private int interrupt = 5000;
@@ -105,10 +105,10 @@ public final class SshMessageStore {
      *
      * @since 0.2.0
      */
-    public synchronized SshMessage getMessage(int[] messageIdFilter)
+    public synchronized SshMessage popMessage(int[] messageIdFilter)
         throws MessageStoreEOFException, InterruptedException {
         try {
-            return getMessage(messageIdFilter, 0);
+            return popMessage(messageIdFilter, 0);
         } catch (MessageNotAvailableException e) {
             // This should never happen but throw just in case
             throw new MessageStoreEOFException();
@@ -136,7 +136,7 @@ public final class SshMessageStore {
      *
      * @since 0.2.0
      */
-    public synchronized SshMessage getMessage(int[] messageIdFilter, int timeout)
+    public synchronized SshMessage popMessage(int[] messageIdFilter, int timeout)
         throws MessageStoreEOFException, MessageNotAvailableException, 
             InterruptedException {
         if ((messages.size() <= 0) && isClosed) {
@@ -194,7 +194,7 @@ public final class SshMessageStore {
      *
      * @since 0.2.0
      */
-    public synchronized SshMessage getMessage(int messageId)
+    public synchronized SshMessage popMessage(int messageId)
         throws MessageStoreEOFException, InterruptedException {
         try {
             return getMessage(messageId, 0);
@@ -229,7 +229,7 @@ public final class SshMessageStore {
             InterruptedException {
         singleIdFilter[0] = messageId;
 
-        return getMessage(singleIdFilter, timeout);
+        return popMessage(singleIdFilter, timeout);
     }
 
     /**
@@ -295,7 +295,7 @@ public final class SshMessageStore {
             throw new MessageNotRegisteredException(messageId);
         }
 
-        Class cls = (Class) register.get(SshMessage.getMessageId(msgdata));
+        Class<SshMessage> cls = register.get(SshMessage.getMessageId(msgdata));
 
         try {
             SshMessage msg = (SshMessage) cls.newInstance();
@@ -604,7 +604,7 @@ public final class SshMessageStore {
             throw new MessageNotRegisteredException(messageId);
         }
 
-        Class cls = (Class) register.get(SshMessage.getMessageId(msgdata));
+        Class<SshMessage> cls = (Class<SshMessage>) register.get(SshMessage.getMessageId(msgdata));
 
         try {
             SshMessage msg = (SshMessage) cls.newInstance();

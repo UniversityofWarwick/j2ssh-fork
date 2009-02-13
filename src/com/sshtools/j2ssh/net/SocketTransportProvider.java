@@ -26,8 +26,10 @@
 package com.sshtools.j2ssh.net;
 
 import java.io.IOException;
-
 import java.net.Socket;
+
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 
 
 /**
@@ -37,6 +39,9 @@ import java.net.Socket;
  * @version $Revision: 1.13 $
  */
 public class SocketTransportProvider extends Socket implements TransportProvider {
+	
+	public static final Log log = LogFactory.getLog(SocketTransportProvider.class);
+	
     /**
      * Creates a new SocketTransportProvider object.
      *
@@ -57,6 +62,12 @@ public class SocketTransportProvider extends Socket implements TransportProvider
      */
     public String getProviderDetail() {
         return toString(); //getRemoteSocketAddress().toString();
+    }
+    
+    @Override
+    public synchronized void close() throws IOException {
+    	log.debug("Closing socket");
+    	super.close();
     }
 
     /*public boolean isConnected() {

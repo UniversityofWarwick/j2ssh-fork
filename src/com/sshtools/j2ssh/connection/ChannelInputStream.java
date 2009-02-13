@@ -267,7 +267,7 @@ public class ChannelInputStream extends InputStream {
                 while ((msg == null) && !isClosed()) {
                     try {
                         log.debug("Waiting for extended channel data");
-                        msg = (SshMsgChannelExtendedData) messageStore.getMessage(filter,
+                        msg = (SshMsgChannelExtendedData) messageStore.popMessage(filter,
                                 interrupt);
                     } catch (MessageNotAvailableException ex) {
                         // Ignore the timeout but this allows us to review the
@@ -287,7 +287,7 @@ public class ChannelInputStream extends InputStream {
                 while ((msg == null) && !isClosed()) {
                     try {
                         log.debug("Waiting for channel data");
-                        msg = (SshMsgChannelData) messageStore.getMessage(filter,
+                        msg = (SshMsgChannelData) messageStore.popMessage(filter,
                                 interrupt);
                     } catch (MessageNotAvailableException ex1) {
                         // Ignore the timeout but this allows us to review the

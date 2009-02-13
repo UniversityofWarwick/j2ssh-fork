@@ -27,6 +27,7 @@ package com.sshtools.daemon.authentication;
 
 import com.sshtools.daemon.configuration.*;
 import com.sshtools.daemon.platform.*;
+import com.sshtools.daemon.util.StringUtil;
 
 import com.sshtools.j2ssh.*;
 import com.sshtools.j2ssh.authentication.*;
@@ -50,7 +51,7 @@ public class AuthenticationProtocolServer extends AsyncService {
     private static Log log = LogFactory.getLog(AuthenticationProtocolServer.class);
     private List completedAuthentications = new ArrayList();
     private Map acceptServices = new HashMap();
-    private List availableAuths;
+    private List<String> availableAuths;
     private String serviceToStart;
     private int[] messageFilter = new int[1];
     private SshMessageStore methodMessages = new SshMessageStore();
@@ -157,16 +158,9 @@ public class AuthenticationProtocolServer extends AsyncService {
                 "Server configuration unavailable");
         }
 
-        availableAuths = new ArrayList();
-
-        Iterator it = SshAuthenticationServerFactory.getSupportedMethods()
-                                                    .iterator();
-        String method;
-        List allowed = server.getAllowedAuthentications();
-
-        while (it.hasNext()) {
-            method = (String) it.next();
-
+        List<String> allowed = server.getAllowedAuthentications();
+        availableAuths = new ArrayList<String>();
+        for (String method : SshAuthenticationServerFactory.getSupportedMethods()) {
             if (allowed.contains(method)) {
                 availableAuths.add(method);
             }
@@ -243,13 +237,10 @@ public class AuthenticationProtocolServer extends AsyncService {
     }
 
     private void sendUserAuthFailure(boolean success) throws IOException {
-        Iterator it = availableAuths.iterator();
-        String auths = null;
-
-        while (it.hasNext()) {
-            auths = ((auths == null) ? "" : (auths + ",")) +
-                (String) it.next();
-        }
+        
+        String auths = StringUtil.current().asString(availableAuths.toArray(new String[0]));
+        
+        if (log.isDebugEnabled()) log.debug("Sending auth result (auths: "+auths+", success : " + success + ")");
 
         SshMsgUserAuthFailure reply = new SshMsgUserAuthFailure(auths, success);
         transport.sendMessage(reply, this);

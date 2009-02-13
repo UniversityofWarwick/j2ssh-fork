@@ -144,7 +144,7 @@ public class AuthenticationProtocolClient extends Service {
         transport.sendMessage(msg, this);
 
         try {
-            msg = messageStore.getMessage(resultFilter);
+            msg = messageStore.popMessage(resultFilter);
         } catch (InterruptedException ex) {
             throw new SshException(
                 "The thread was interrupted whilst waiting for an authentication message");
@@ -182,7 +182,7 @@ public class AuthenticationProtocolClient extends Service {
 
             auth.authenticate(this, serviceToStart.getServiceName());
 
-            SshMessage msg = parseMessage(messageStore.getMessage(resultFilter));
+            SshMessage msg = parseMessage(messageStore.popMessage(resultFilter));
 
             // We should not get this far
             throw new AuthenticationProtocolException(
@@ -258,7 +258,7 @@ public class AuthenticationProtocolClient extends Service {
     private SshMessage internalReadMessage(int[] messageIdFilter)
         throws TerminatedStateException, IOException {
         try {
-            SshMessage msg = messageStore.getMessage(messageIdFilter);
+            SshMessage msg = messageStore.popMessage(messageIdFilter);
 
             return parseMessage(msg);
         } catch (MessageStoreEOFException meof) {

@@ -89,6 +89,7 @@ class TransportProtocolInputStream {
         throws IOException {
         this.transport = transport;
         this.in = new BufferedInputStream(in);
+        //this.in = in;
         this.algorithms = algorithms;
     }
     
@@ -135,9 +136,6 @@ class TransportProtocolInputStream {
     protected int readBufferedData(byte[] buf, int off, int len)
         throws IOException {
     	
-    	// TODO investigate whether this method could be:
-    	//return in.read(buf,off,len);
-    	
         int read;
 
         //if we don't already have enough data...
@@ -146,6 +144,7 @@ class TransportProtocolInputStream {
         	
             if ((buffered.length - endpos) < len) {
                 // no it does not odds are that the startpos is too high
+            	if (log.isDebugEnabled()) log.debug("Shifting buffer contents to start");
                 System.arraycopy(buffered, startpos, buffered, 0,
                     endpos - startpos);
                 endpos -= startpos;
@@ -166,7 +165,6 @@ class TransportProtocolInputStream {
             while (((endpos - startpos) < len) &&
                     (transport.getState().getValue() != TransportProtocolState.DISCONNECTED)) {
                 try {
-                	
                     read = in.read(buffered, endpos, (buffered.length - endpos));
                 } catch (InterruptedIOException ex) { 
                     // We have an interrupted io; inform the event handler
@@ -183,8 +181,6 @@ class TransportProtocolInputStream {
                 }
                 endpos += bytesRead;
             }
-            
-           
         } else {
         	//log.info("[TPIS][endpos-startpos >= len]");
         }
@@ -213,7 +209,6 @@ class TransportProtocolInputStream {
         // Read the first byte of this message (this is so we block
         // but we will determine the cipher length before reading all
         read = readBufferedData(initial, 0, cipherlen);
-        
 
         cipher = algorithms.getCipher();
 

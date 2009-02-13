@@ -42,7 +42,7 @@ public abstract class Channel {
 	private static Log log = LogFactory.getLog(Channel.class);
 
 	protected ChannelDataWindow localWindow = new ChannelDataWindow("local");
-	protected ChannelDataWindow remoteWindow = new ChannelDataWindow("remote", false);
+	protected ChannelDataWindow remoteWindow = new ChannelDataWindow("remote", true);
 	protected ConnectionProtocol connection;
 
 	protected long localChannelId;
@@ -143,7 +143,6 @@ public abstract class Channel {
 					log.debug("Channel " + String.valueOf(localChannelId)
 							+ " requires more window space [" + name + "]");
 				}
-
 				windowSpace = getMaximumWindowSpace() - windowSpace;
 				log.debug("Requesting connection protocol increase window");
 				connection.sendChannelWindowAdjust(this, windowSpace);

@@ -61,7 +61,7 @@ public interface SshAPIConfiguration {
      *
      * @return
      */
-    public List getAuthenticationExtensions();
+    public List<ExtensionAlgorithm> getAuthenticationExtensions();
 
     /**
      *

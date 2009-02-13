@@ -27,8 +27,11 @@ package com.sshtools.daemon;
 
 import java.io.IOException;
 import java.net.InetAddress;
+import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.nio.channels.ServerSocketChannel;
+import java.nio.channels.SocketChannel;
 import java.util.LinkedList;
 import java.util.List;
 
@@ -44,6 +47,7 @@ import com.sshtools.j2ssh.SshThread;
 import com.sshtools.j2ssh.configuration.ConfigurationLoader;
 import com.sshtools.j2ssh.configuration.SshConnectionProperties;
 import com.sshtools.j2ssh.connection.ConnectionProtocol;
+import com.sshtools.j2ssh.net.ConnectedSocketChannelTransportProvider;
 import com.sshtools.j2ssh.net.ConnectedSocketTransportProvider;
 import com.sshtools.j2ssh.transport.TransportProtocol;
 import com.sshtools.j2ssh.transport.TransportProtocolEventAdapter;
@@ -230,64 +234,35 @@ public abstract class SshServer {
         }
     }
 
-    /**
- *
- *
- * @param msg
- */
+ 
     protected abstract void shutdown(String msg);
 
     /**
- *
- *
- * @param connection
- *
- * @throws IOException
- */
+     * 
+     */
     protected abstract void configureServices(ConnectionProtocol connection)
         throws IOException;
 
-    /**
- *
- *
- * @param socket
- *
- * @throws IOException
- */
-    protected void refuseSession(Socket socket) throws IOException {
+ 
+    protected void refuseSession(SocketChannel socketChannel) throws IOException {
+    	if (log.isDebugEnabled()) log.debug("Refuse session");
         TransportProtocolServer transport = new TransportProtocolServer(true);
-        transport.startTransportProtocol(new ConnectedSocketTransportProvider(
-                socket), new SshConnectionProperties());
+        transport.startTransportProtocol(new ConnectedSocketChannelTransportProvider(socketChannel), new SshConnectionProperties());
     }
 
-    /**
- *
- *
- * @param socket
- *
- * @return
- *
- * @throws IOException
- */
-    protected TransportProtocolServer createSession(Socket socket)
+    protected TransportProtocolServer createSession(SocketChannel socketChannel)
         throws IOException {
-        log.debug("Initializing connection");
-
-        InetAddress address = socket.getInetAddress();
-
-        /*( (InetSocketAddress) socket
-     .getRemoteSocketAddress()).getAddress();*/
-        
-        log.debug("Remote Address: " + address.toString());
+    	if (log.isDebugEnabled()) log.debug("Initializing connection");
+        InetAddress address = socketChannel.socket().getInetAddress();
+        if (log.isDebugEnabled()) log.debug("Remote Address: " + address.toString());
 
         TransportProtocolServer transport = new TransportProtocolServer();
-
-        // Create the Authentication Protocol
         AuthenticationProtocolServer authentication = new AuthenticationProtocolServer();
-
-        // Create the Connection Protocol
         ConnectionProtocol connection = new ConnectionProtocol();
 
+        ConnectedSocketChannelTransportProvider transportProvider 
+				= new ConnectedSocketChannelTransportProvider(socketChannel);
+        
         // Configure the connections services
         configureServices(connection);
 
@@ -296,15 +271,14 @@ public abstract class SshServer {
 
         // Allow the Authentication Protocol to be accepted by the Transport Protocol
         transport.acceptService(authentication);
-        transport.startTransportProtocol(new ConnectedSocketTransportProvider(
-                socket), new SshConnectionProperties());
+		transport.startTransportProtocol(transportProvider, new SshConnectionProperties());
 
         return transport;
     }
 
     class ConnectionListener implements Runnable {
         private Log log = LogFactory.getLog(ConnectionListener.class);
-        private ServerSocket server;
+        private ServerSocketChannel server;
         private InetAddress listenAddress;
         private Thread thread;
         private int maxConnections;
@@ -321,39 +295,45 @@ public abstract class SshServer {
                 log.debug("Starting connection listener thread on address " + listenAddress);
                 state.setValue(StartStopState.STARTED);
                 
-                server = new ServerSocket(port, 0, listenAddress);
+                //server = new ServerSocket(port, 0, listenAddress);
+                //Socket socket;
+                
+                server = ServerSocketChannel.open();
+                server.socket().bind(new InetSocketAddress(listenAddress, port), 0);
+                log.debug("ServerSocketChannel opened. blocking: " + server.isBlocking());
 
-                Socket socket;
-                maxConnections = ((ServerConfiguration) ConfigurationLoader.getConfiguration(ServerConfiguration.class)).getMaxConnections();
+                SocketChannel socketChannel;
+                maxConnections = ConfigurationLoader.getConfiguration(ServerConfiguration.class).getMaxConnections();
 
                 boolean refuse = false;
                 TransportProtocolEventHandler eventHandler = new TransportProtocolEventAdapter() {
-                        public void onDisconnect(TransportProtocol transport) {
-                            // Remove from our active channels list only if
-                            // were still connected (the thread cleans up
-                            // when were exiting so this is to avoid any concurrent
-                            // modification problems
-                            if (state.getValue() != StartStopState.STOPPED) {
-                                synchronized (activeConnections) {
-                                    log.info(transport.getUnderlyingProviderDetail() +
-                                        " connection closed");
-                                    activeConnections.remove(transport);
-                                }
+                    public void onDisconnect(TransportProtocol transport) {
+                        // Remove from our active channels list only if
+                        // we're still connected (the thread cleans up
+                        // when were exiting so this is to avoid any concurrent
+                        // modification problems
+                        if (state.getValue() != StartStopState.STOPPED) {
+                            synchronized (activeConnections) {
+                                log.info(transport.getUnderlyingProviderDetail() + " connection closed");
+                                activeConnections.remove(transport);
                             }
                         }
-                    };
+                    }
+                };
 
                 try {
-                    while (((socket = server.accept()) != null) &&
+                    while (((socketChannel = server.accept()) != null) &&
                             (state.getValue() == StartStopState.STARTED)) {
                         log.debug("New connection requested");
+                        
+                        Socket socket = socketChannel.socket();
 
                         if (!isAcceptingConnections() || maxConnections < activeConnections.size()) {
-                            refuseSession(socket);
+                            refuseSession(socketChannel);
                         } else {
-                            TransportProtocolServer transport = createSession(socket);
+                            TransportProtocolServer transport = createSession(socketChannel);
                             log.info("Monitoring active session from " +
-                                socket.getInetAddress().toString());
+                            		socket.getInetAddress().toString());
 
                             synchronized (activeConnections) {
                                 activeConnections.add(transport);

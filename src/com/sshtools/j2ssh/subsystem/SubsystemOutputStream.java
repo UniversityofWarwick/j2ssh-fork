@@ -55,18 +55,15 @@ public class SubsystemOutputStream extends OutputStream {
 	 * _rest_ of the message.
 	 */
 	private static final int LENGTH_BYTES = 4;
-	
-	private static final long AMOUNT_OF_TIME_TO_WAIT_FOR_SFTPDRIVE_TO_GET_ITS_SHIT_TOGETHER = 1000;
 
 	private static final Log LOG = LogFactory.getLog(SubsystemOutputStream.class);
 	
     // Temporary storage buffer to build up a message
-    ByteArrayOutputStream buffer = new ByteArrayOutputStream();
-    SubsystemMessageStore messageStore;
-    int messageStart = 0;
-    
-    long lastChunkReceived;
-
+	private ByteArrayOutputStream buffer = new ByteArrayOutputStream();
+	// Where in the buffer does the current message start
+	private int messageStart = 0;
+	
+	private SubsystemMessageStore messageStore;
     
     /**
      * Creates a new SubsystemOutputStream object.
@@ -76,40 +73,6 @@ public class SubsystemOutputStream extends OutputStream {
     public SubsystemOutputStream(SubsystemMessageStore messageStore) {
         super();
         this.messageStore = messageStore;
-        
-        /*
-         * This is some testing code to log a status message every 2 seconds,
-         * so I can keep an eye on the state of the stream buffer. 
-         */
-//        t = new Timer("SubsystemOutputStream");
-//        t.scheduleAtFixedRate(new TimerTask(){
-//			@Override
-//			public void run() {
-//				//LOG.info("I am going to write you a story");
-//				int messageLength = -1;
-//				int messageType = -1;
-//				if (buffer.size() > messageStart + 5 ) {
-//					messageLength = (int) ByteArrayReader.readInt(buffer.toByteArray(), messageStart);
-//					messageType = buffer.toByteArray()[messageStart + LENGTH_BYTES];
-//				}
-//				LOG.info(String.format("[SSOS][%d][buffer=%d][messageStart=%d][messageLength=%d][messageType=%d]", hashCode(), buffer.size(), messageStart, messageLength, messageType));
-//				
-//				if (System.currentTimeMillis() > lastChunkReceived + AMOUNT_OF_TIME_TO_WAIT_FOR_SFTPDRIVE_TO_GET_ITS_SHIT_TOGETHER) {
-//					if (messageStart < buffer.size()) {
-//						//stuck with part of a message. what is going on?
-//						LOG.warn("Stuck with half a message");
-////						try {
-////							processIncompleteMessage();
-////						} catch (IOException e) {
-////							// TODO Auto-generated catch block
-////							LOG.error("Error trying to package up IncompleteMessage", e);
-////						}
-//					}
-//				}
-//			}
-//
-//		}, new Date(), 2000);
-        
     }
 
 
@@ -153,13 +116,12 @@ public class SubsystemOutputStream extends OutputStream {
 
     private void processMessage() throws IOException {
     	synchronized(buffer) {
-	    	lastChunkReceived = System.currentTimeMillis();
 	        // Now try to process a message
 	        if (buffer.size() > (messageStart + LENGTH_BYTES)) {
 	        	//Messagelength is the length of data AFTER the 4 bytes containing the length.
 	            int messageLength = (int) ByteArrayReader.readInt(buffer.toByteArray(),
 	                    messageStart);
-	            int messageType = buffer.toByteArray()[messageStart + LENGTH_BYTES];
+	            //int messageType = buffer.toByteArray()[messageStart + LENGTH_BYTES];
 	            
 	            if (messageLength + messageStart <= (buffer.size() - LENGTH_BYTES)) {
 	            	
@@ -177,47 +139,30 @@ public class SubsystemOutputStream extends OutputStream {
 	                        ime.getMessage());
 	                }
 	
-	                if (messageLength + messageStart == (buffer.size() - LENGTH_BYTES)) {
+	                if (messageStart + LENGTH_BYTES + messageLength == (buffer.size())) {
+	                	//Message reached the exact end of the buffer, so reset it
+	                	if (LOG.isDebugEnabled()) LOG.debug("Reset buffer");
 	                    buffer.reset();
 	                    messageStart = 0;
 	                } else {
 	                	int remaining = buffer.size() - (LENGTH_BYTES + messageLength + messageStart);
 	                    messageStart += messageLength + LENGTH_BYTES;
+	                    if (LOG.isDebugEnabled()) LOG.debug("Start buffer at " + messageStart);
 	                    //write() may not get called again, so
 	                    //we need to check whether these extra bytes are a whole
 	                    //message. Otherwise it will be stuck in buffer limbo.
 	                    processMessage();
 	                }
 	            } else {
-	            	//LOG.debug("Incomplete message: "+messageLength+", messageStart:"+messageStart+", buffer:"+(buffer.size() - LENGTH_BYTES));
+	            	if (LOG.isDebugEnabled()) {
+	            		LOG.debug("Incomplete message: "+messageLength+", messageStart:"+messageStart+", buffer:"+(buffer.size() - LENGTH_BYTES));
+	            	}
 	            }
 	        } else {
-	        	//LOG.debug("Haven't received the message length yet");
+	        	if (LOG.isDebugEnabled()) {
+	        		LOG.debug("Haven't received the message length yet");
+	        	}
 	        }
     	}
     }
-    
-    // HACK HACK HACK HACK
-	private void processIncompleteMessage() throws IOException {
-		synchronized(buffer) {
-			//Do this check again, just in case it locks and a message comes in to
-			//fix it. Incredibly unlikely but hey
-			if (System.currentTimeMillis() > lastChunkReceived + AMOUNT_OF_TIME_TO_WAIT_FOR_SFTPDRIVE_TO_GET_ITS_SHIT_TOGETHER) {
-				LOG.warn("Generating an IncompleteMessage as we have data stuck in the buffer");
-				int messageLength = buffer.size() - (LENGTH_BYTES + messageStart);  // HACK HACK HACK HACK
-		        byte[] msgdata = new byte[messageLength];
-		        
-		        // Process a message
-		        System.arraycopy(buffer.toByteArray(), messageStart + LENGTH_BYTES,
-		            msgdata, 0, messageLength);
-				
-				IncompleteMessage message = new IncompleteMessage();
-				message.fromByteArray(msgdata);
-				messageStore.addMessage(message);
-				
-				buffer.reset();
-				messageStart = 0;
-			}
-		}
-	}
 }

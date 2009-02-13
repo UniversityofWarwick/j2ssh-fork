@@ -174,7 +174,7 @@ public class ConnectionProtocol extends AsyncService {
             messageIdFilter[1] = SshMsgChannelOpenFailure.SSH_MSG_CHANNEL_OPEN_FAILURE;
 
             try {
-                SshMessage result = messageStore.getMessage(messageIdFilter);
+                SshMessage result = messageStore.popMessage(messageIdFilter);
 
                 if (result.getMessageId() == SshMsgChannelOpenConfirmation.SSH_MSG_CHANNEL_OPEN_CONFIRMATION) {
                     SshMsgChannelOpenConfirmation conf = (SshMsgChannelOpenConfirmation) result;
@@ -385,7 +385,7 @@ public class ConnectionProtocol extends AsyncService {
 
             try {
               // Wait for either success or failure
-              SshMessage reply = messageStore.getMessage(messageIdFilter);
+              SshMessage reply = messageStore.popMessage(messageIdFilter);
               
               switch (reply.getMessageId()) {
               case SshMsgChannelSuccess.SSH_MSG_CHANNEL_SUCCESS: {
@@ -482,7 +482,7 @@ public class ConnectionProtocol extends AsyncService {
 
             try {
                 // Wait for either success or failure
-                SshMessage reply = messageStore.getMessage(messageIdFilter);
+                SshMessage reply = messageStore.popMessage(messageIdFilter);
 
                 switch (reply.getMessageId()) {
 	                case SshMsgRequestSuccess.SSH_MSG_REQUEST_SUCCESS: {

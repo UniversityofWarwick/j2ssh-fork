@@ -45,7 +45,7 @@ import java.io.IOException;
  * @since 0.2.0
  */
 public abstract class AsyncService extends Service implements Runnable {
-    private static Log log = LogFactory.getLog(Service.class);
+    private static Log log = LogFactory.getLog(AsyncService.class);
 
     /**  */
     protected SshThread thread;
@@ -103,7 +103,7 @@ public abstract class AsyncService extends Service implements Runnable {
 	                transport.isConnected()) {
 	            try {
 	                // Get the next message from the message store
-	                msg = messageStore.getMessage(messageFilter);
+	                msg = messageStore.popMessage(messageFilter);
 	
 	                if (state.getValue() == ServiceState.SERVICE_STOPPED) {
 	                    break;
