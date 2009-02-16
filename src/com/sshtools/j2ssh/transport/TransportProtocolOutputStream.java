@@ -90,10 +90,8 @@ class TransportProtocolOutputStream {
     protected synchronized void sendMessage(SshMessage msg)
         throws TransportProtocolException {
         try {
-        	log.debug("Locking algorithms");
             // Get the algorithm objects
             algorithms.lock();
-            log.debug("Locked algorithms");
 
             SshCipher cipher = algorithms.getCipher();
             SshHmac hmac = algorithms.getHmac();
@@ -167,9 +165,7 @@ class TransportProtocolOutputStream {
             bytesTransfered += message.size();
 
             // Send!
-            log.debug("Writing "+message.size()+" bytes to output stream");
             out.write(message.toByteArray());
-            log.debug("Wrote "+message.size()+" bytes to output stream");
 
             out.flush();
 

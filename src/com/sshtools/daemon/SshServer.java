@@ -48,7 +48,6 @@ import com.sshtools.j2ssh.configuration.ConfigurationLoader;
 import com.sshtools.j2ssh.configuration.SshConnectionProperties;
 import com.sshtools.j2ssh.connection.ConnectionProtocol;
 import com.sshtools.j2ssh.net.ConnectedSocketChannelTransportProvider;
-import com.sshtools.j2ssh.net.ConnectedSocketTransportProvider;
 import com.sshtools.j2ssh.transport.TransportProtocol;
 import com.sshtools.j2ssh.transport.TransportProtocolEventAdapter;
 import com.sshtools.j2ssh.transport.TransportProtocolEventHandler;

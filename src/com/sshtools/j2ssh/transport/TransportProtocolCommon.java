@@ -42,9 +42,12 @@ import org.apache.commons.logging.LogFactory;
 
 import java.io.EOFException;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.InterruptedIOException;
 
 import java.math.BigInteger;
+import java.nio.ByteBuffer;
+import java.nio.channels.Channels;
 
 import java.security.NoSuchAlgorithmException;
 
@@ -346,10 +349,14 @@ implements TransportProtocol, Runnable
         algorithmsIn = new TransportProtocolAlgorithmSync();
         
         // Create the input/output streams
-        sshIn = new TransportProtocolInputStream(this,
-            provider.getInputStream(), algorithmsIn);
-        sshOut = new TransportProtocolOutputStream(provider.getOutputStream(),
-            this, algorithmsOut);
+        sshIn = new TransportProtocolInputStream(
+        	this,
+            Channels.newInputStream(provider.getReadableByteChannel()), 
+            algorithmsIn);
+        sshOut = new TransportProtocolOutputStream(
+        	Channels.newOutputStream(provider.getWritableByteChannel()),
+            this, 
+            algorithmsOut);
         
         // Register the transport layer messages that this class will handle
         messageStore.registerMessage(SshMsgDisconnect.SSH_MSG_DISCONNECT,
@@ -426,9 +433,8 @@ implements TransportProtocol, Runnable
         if (sender instanceof SshKeyExchange ||
                 sender instanceof TransportProtocolCommon ||
                 (currentState == TransportProtocolState.CONNECTED)) {
-        	log.debug("Posting message to output stream");
+        	
             sshOut.sendMessage(msg);
-            log.debug("Posted message to output stream");
 
             if (currentState == TransportProtocolState.CONNECTED) {
                 if (sendIgnore) {
@@ -1152,7 +1158,7 @@ implements TransportProtocol, Runnable
         String data = getLocalId() + "\r\n";
 
         // Send our version string
-        provider.getOutputStream().write(data.getBytes());
+        provider.getWritableByteChannel().write(ByteBuffer.wrap(data.getBytes()));
 
         // Now wait for a reply and evaluate the ident string
         //buf = new byte[255];
@@ -1164,7 +1170,10 @@ implements TransportProtocol, Runnable
         while (!remoteVer.startsWith("SSH-") &&
                 (buffer.length() < MAX_BUFFER_LENGTH)) {
             // Get the next string
-            while (((ch = (char) provider.getInputStream().read()) != '\n') &&
+        	
+        	InputStream is = Channels.newInputStream(provider.getReadableByteChannel());
+        	
+            while (((ch = (char) is.read()) != '\n') &&
                     (buffer.length() < MAX_BUFFER_LENGTH)) {
                 buffer.append(ch);
             }

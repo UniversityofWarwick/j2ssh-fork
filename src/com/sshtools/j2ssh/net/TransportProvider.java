@@ -26,6 +26,8 @@
 package com.sshtools.j2ssh.net;
 
 import java.io.*;
+import java.nio.channels.ReadableByteChannel;
+import java.nio.channels.WritableByteChannel;
 
 
 /**
@@ -43,7 +45,7 @@ public interface TransportProvider {
     public void close() throws IOException;
 
     //public boolean isConnected();
-    public InputStream getInputStream() throws IOException;
+    public ReadableByteChannel getReadableByteChannel() throws IOException;
 
     /**
      *
@@ -52,7 +54,7 @@ public interface TransportProvider {
      *
      * @throws IOException
      */
-    public OutputStream getOutputStream() throws IOException;
+    public WritableByteChannel getWritableByteChannel() throws IOException;
 
     /**
      *
