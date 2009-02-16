@@ -27,7 +27,7 @@ public class DummyAuthenticationProvider extends NativeAuthenticationProvider {
 
 	@Override
 	public String getHomeDirectory(String username) throws IOException {
-		return "/home/" + username;
+		return "/tmp/home/" + username;
 	}
 
 	@Override
