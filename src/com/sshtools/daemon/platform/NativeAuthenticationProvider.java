@@ -147,7 +147,7 @@ public abstract class NativeAuthenticationProvider {
 
                 instance = (NativeAuthenticationProvider) cls.newInstance();
             } catch (Exception e) {
-                throw new IOException("The authentication provider failed to initialize: ", e);
+                throw new IOException("The authentication provider failed to initialize - " + e.toString());
             }
         }
 
