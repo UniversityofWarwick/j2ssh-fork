@@ -134,13 +134,11 @@ public class ConnectionProtocol extends AsyncService {
     }
 
     private Long getChannelId() {
-       // synchronized (activeChannels) { 
             if (reusableChannels.size() <= 0) {
                 return new Long(nextChannelId++);
             } else {
                 return (Long) reusableChannels.iterator().next();
             }
-        //}
     }
 
     /**
@@ -154,9 +152,9 @@ public class ConnectionProtocol extends AsyncService {
      * @throws IOException
      * @throws SshException
      */
-    public synchronized boolean openChannel(Channel channel,
+    public boolean openChannel(Channel channel,
         ChannelEventListener eventListener) throws IOException {
-        //synchronized (activeChannels) {
+        synchronized (activeChannels) {
             Long channelId = getChannelId();
 
             // Create the message
@@ -201,41 +199,38 @@ public class ConnectionProtocol extends AsyncService {
                 throw new SshException(
                     "The thread was interrupted whilst waiting for a connection protocol message");
             }
-        //}
-    }
-
-    /**
-     *
-     */
-    protected synchronized void onStop() {
-        log.info("Closing all active channels");
-		log.info("thread has "+activeChannels.values().size()+" active channels to stop");
-        try {
-            for (Channel channel : activeChannels.values()) {
-                if (channel != null) {
-                    if (log.isDebugEnabled()) {
-                        log.debug("Closing " + channel.getName() + " id=" +
-                            String.valueOf(channel.getLocalChannelId()));
-                    }
-                    channel.close();
-                }
-            }
-        } catch (Throwable t) {
-			log.error("Unable to close all channels: "+t.getMessage(),t);
         }
-
-        activeChannels.clear();
     }
 
     /**
      *
-     *
-     * @param channel
-     * @param data
-     *
-     * @throws IOException
      */
-    public synchronized void sendChannelData(Channel channel, byte[] data)
+    protected void onStop() {
+    	synchronized(activeChannels) {
+	        log.info("Closing all active channels");
+			log.info("thread has "+activeChannels.values().size()+" active channels to stop");
+	        try {
+	            for (Channel channel : activeChannels.values()) {
+	                if (channel != null) {
+	                    if (log.isDebugEnabled()) {
+	                        log.debug("Closing " + channel.getName() + " id=" +
+	                            String.valueOf(channel.getLocalChannelId()));
+	                    }
+	                    channel.close();
+	                }
+	            }
+	        } catch (Throwable t) {
+				log.error("Unable to close all channels: "+t.getMessage(),t);
+	        }
+	
+	        activeChannels.clear();
+    	}
+    }
+
+    /**
+     * Send data to this channel. Consumes some space in the remote window.
+     */
+    public void sendChannelData(Channel channel, byte[] data)
         throws IOException {
         synchronized (channel.getState()) {
             if (log.isDebugEnabled()) {
@@ -248,28 +243,36 @@ public class ConnectionProtocol extends AsyncService {
             int block;
             int remaining;
             long max;
-            byte[] buffer;
+            byte[] buffer = null;
             ChannelDataWindow window = channel.getRemoteWindow();
 
             while (sent < data.length) {
                 remaining = data.length - sent;
-                max = ((window.getWindowSpace() < channel.getRemotePacketSize()) &&
-                    (window.getWindowSpace() > 0)) ? window.getWindowSpace()
-                                                   : channel.getRemotePacketSize();
-                block = (max < remaining) ? (int) max : remaining;
-                channel.remoteWindow.consumeWindowSpace(block);
-                buffer = new byte[block];
+                // sync on window so the size doesn't change while we're sending
+                // TODO necessary? already synced on channel and this is the only place the window is modified
+                synchronized(window) {	                
+	                // Don't do anything until we have some window space.
+	                window.waitForWindowSpace(1);
+	                
+	                long windowSpace = window.getWindowSpace();
+	                
+	                // Length of data to send now is the smallest among:
+	                //   the remaining data to send
+	                //   the amount of window space available
+	                //   the remote packet size
+	                block = (int)Math.min(remaining, Math.min(windowSpace, channel.getRemotePacketSize()));
+	                
+	                window.consumeWindowSpace(block);
+                }
+                if (buffer == null || buffer.length != block) {
+                	buffer = new byte[block];
+                }
                 System.arraycopy(data, sent, buffer, 0, block);
 
                 SshMsgChannelData msg = new SshMsgChannelData(channel.getRemoteChannelId(),
                         buffer);
                 transport.sendMessage(msg, this);
-
-                /*                if (type != null) {
-                     channel.sendChannelExtData(type.intValue(), buffer);
-                                } else {
-                                    channel.sendChannelData(buffer);
-                                }*/
+                
                 sent += block;
             }
         }
@@ -308,7 +311,7 @@ public class ConnectionProtocol extends AsyncService {
      *
      * @throws IOException
      */
-    public synchronized void sendChannelExtData(Channel channel,
+    public void sendChannelExtData(Channel channel,
         int extendedType, byte[] data) throws IOException {
     	
     	if (log.isDebugEnabled()) {
@@ -317,36 +320,39 @@ public class ConnectionProtocol extends AsyncService {
                 String.valueOf(channel.getLocalChannelId()));
         }
     	
-        channel.getRemoteWindow().consumeWindowSpace(data.length);
-        
-        int sent = 0;
-        int block;
-        int remaining;
-        long max;
-        byte[] buffer;
-        ChannelDataWindow window = channel.getRemoteWindow();
-
-        while (sent < data.length) {
-            remaining = data.length - sent;
-            max = ((window.getWindowSpace() < channel.getRemotePacketSize()) &&
-                (window.getWindowSpace() > 0)) ? window.getWindowSpace()
-                                               : channel.getRemotePacketSize();
-            block = (max < remaining) ? (int) max : remaining;
-            channel.remoteWindow.consumeWindowSpace(block);
-            buffer = new byte[block];
-            System.arraycopy(data, sent, buffer, 0, block);
-
-            SshMsgChannelExtendedData msg = new SshMsgChannelExtendedData(channel.getRemoteChannelId(),
-                    extendedType, buffer);
-            transport.sendMessage(msg, this);
-
-            /*                if (type != null) {
-                            channel.sendChannelExtData(type.intValue(), buffer);
-                        } else {
-                            channel.sendChannelData(buffer);
-                        }*/
-            sent += block;
-        }
+    	synchronized(channel.getState()) {
+    	
+	        channel.getRemoteWindow().consumeWindowSpace(data.length);
+	        
+	        int sent = 0;
+	        int block;
+	        int remaining;
+	        long max;
+	        byte[] buffer;
+	        ChannelDataWindow window = channel.getRemoteWindow();
+	
+	        while (sent < data.length) {
+	            remaining = data.length - sent;
+	            max = ((window.getWindowSpace() < channel.getRemotePacketSize()) &&
+	                (window.getWindowSpace() > 0)) ? window.getWindowSpace()
+	                                               : channel.getRemotePacketSize();
+	            block = (max < remaining) ? (int) max : remaining;
+	            channel.remoteWindow.consumeWindowSpace(block);
+	            buffer = new byte[block];
+	            System.arraycopy(data, sent, buffer, 0, block);
+	
+	            SshMsgChannelExtendedData msg = new SshMsgChannelExtendedData(channel.getRemoteChannelId(),
+	                    extendedType, buffer);
+	            transport.sendMessage(msg, this);
+	
+	            /*                if (type != null) {
+	                            channel.sendChannelExtData(type.intValue(), buffer);
+	                        } else {
+	                            channel.sendChannelData(buffer);
+	                        }*/
+	            sent += block;
+	        }
+    	}
     }
 
     /**
@@ -447,8 +453,7 @@ public class ConnectionProtocol extends AsyncService {
      */
     public void sendChannelWindowAdjust(Channel channel, long bytesToAdd)
         throws IOException {
-        log.debug("Increasing window size by " + String.valueOf(bytesToAdd) +
-            " bytes");
+        log.debug("Increasing window size by " + String.valueOf(bytesToAdd) + " bytes");
 
         SshMsgChannelWindowAdjust msg = new SshMsgChannelWindowAdjust(channel.getRemoteChannelId(),
                 bytesToAdd);
@@ -825,14 +830,11 @@ public class ConnectionProtocol extends AsyncService {
                 "Remote computer sent data for non existent channel");
         }
 
-        //http://sourceforge.net/tracker/index.php?func=detail&aid=2025955&group_id=60894&atid=495562
-        //channel.getLocalWindow().consumeWindowSpace(msg.getChannelData().length);
         channel.processChannelData(msg);
     }
 
     private void onMsgChannelOpen(SshMsgChannelOpen msg)
         throws IOException {
-        //synchronized (activeChannels) {
             log.info("Request for " + msg.getChannelType() +
                 " channel recieved");
 
@@ -855,10 +857,15 @@ public class ConnectionProtocol extends AsyncService {
                 Channel channel = cf.createChannel(msg.getChannelType(),
                         msg.getChannelData());
 
-                // Initialize the channel
-                log.info("Initiating channel");
-
                 Long channelId = getChannelId();
+                
+                // Initialize the channel
+                log.info(String.format("Initiating channel %d, sender ID %d, Remote window %d, Remote max packet %d",
+                		channelId.longValue(),
+                		msg.getSenderChannelId(),
+                		msg.getInitialWindowSize(),
+                		msg.getMaximumPacketSize()));
+
                 channel.init(this, channelId.longValue(),
                     msg.getSenderChannelId(), msg.getInitialWindowSize(),
                     msg.getMaximumPacketSize());
@@ -875,7 +882,7 @@ public class ConnectionProtocol extends AsyncService {
                     SshMsgChannelOpenFailure.SSH_OPEN_CONNECT_FAILED,
                     ice.getMessage(), "");
             }
-        //}
+      
     }
 
     private void onMsgChannelRequest(SshMsgChannelRequest msg)

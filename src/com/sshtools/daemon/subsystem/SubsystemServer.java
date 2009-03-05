@@ -102,22 +102,22 @@ public abstract class SubsystemServer implements Runnable {
 
         try {
             while (state.getValue() == StartStopState.STARTED) {
-            	//log.debug("Checking for an incoming message...");
                 SubsystemMessage msg = incoming.nextMessage();
-//                if (log.isDebugEnabled()) {
-//                	log.debug(String.format("Processed message %s. %d messages left in queue.", 
-//                				msg.getClass().getSimpleName(), incoming.size()));
-//                }
                 if (msg != null) {
-                    onMessageReceived(msg);
-                    //log.debug(String.format("Completed processing of message %s.", msg.getClass().getSimpleName()));
+                	try {
+                		onMessageReceived(msg);
+                	} finally {
+                		msg.finish();
+                	}
                 } else {
                 	log.debug("Null message");
                 }
             }
             log.debug("SubsystemServer finished");
         } catch (MessageStoreEOFException meof) {
-        	log.warn("EOF in message store", meof);
+        	if (state.getValue() == StartStopState.STARTED) {
+        		log.warn("EOF in message store", meof);
+        	}
         }
 
         thread = null;
@@ -145,6 +145,10 @@ public abstract class SubsystemServer implements Runnable {
         state.setValue(StartStopState.STOPPED);
         incoming.close();
         outgoing.close();
+        if (thread != null) {
+        	//Kick the message loop if waiting, so it can notice we're closing down
+        	thread.interrupt();
+        }
     }
 
     /**

@@ -30,10 +30,23 @@ import org.apache.commons.logging.LogFactory;
 
 
 /**
- *
- *
- * @author $author$
- * @version $Revision: 1.19 $
+ * A sliding window that represents how much data a computer is willing to receive.
+ * The application will have two window objects per channel.
+ * 
+ * The local window represents how much data we are willing to receive. As we
+ * receive data the window shrinks. When we think the window is too small, we increase it
+ * and send a channel window adjust message to the other computer to let it know
+ * how much we're growing it by.
+ * 
+ * The remote window represents the other host's local window. As we send them channel
+ * data the remote window shrinks. If it gets to 0 we don't send any more data to them
+ * until they send us a channel window adjust message. This ensures that we don't send
+ * more data than the client can handle.
+ * 
+ * So in reality there are only two windows, but each host keeps track of both. Problems
+ * can occur if one host's local window gets out of sync with the other host's
+ * remote window, as they are supposed to be the same. It can lead to deadlocks and
+ * disconnections.
  */
 public class ChannelDataWindow {
     private static Log log = LogFactory.getLog(ChannelDataWindow.class);

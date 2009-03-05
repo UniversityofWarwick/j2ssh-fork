@@ -25,6 +25,7 @@
  */
 package com.sshtools.j2ssh.sftp;
 
+import com.sshtools.j2ssh.StaticBytePool;
 import com.sshtools.j2ssh.io.ByteArrayReader;
 import com.sshtools.j2ssh.io.ByteArrayWriter;
 import com.sshtools.j2ssh.io.UnsignedInteger32;
@@ -69,8 +70,26 @@ public class SshFxpWrite extends SubsystemMessage implements MessageRequestId {
         this.id = id;
         this.handle = handle;
         this.offset = offset;
-        this.data = new byte[len];
+        this.data = StaticBytePool.get(len);
         System.arraycopy(data, off, this.data, 0, len);
+    }
+    
+    @Override
+    public void finish() {
+    	if (this.data != null) {
+    		StaticBytePool.recycle(this.data);
+    		this.data = null;
+    	}
+    	if (this.handle != null) {
+    		StaticBytePool.recycle(this.handle);
+    		this.handle = null;
+    	}
+    }
+    
+    @Override
+    protected void finalize() throws Throwable {
+    	super.finalize();
+    	finish();//just to make sure
     }
 
     /**
@@ -122,9 +141,9 @@ public class SshFxpWrite extends SubsystemMessage implements MessageRequestId {
         throws java.io.IOException, 
             com.sshtools.j2ssh.transport.InvalidMessageException {
         id = bar.readUINT32();
-        handle = bar.readBinaryString();
+        handle = bar.readBinaryStringPooled();
         offset = bar.readUINT64();
-        data = bar.readBinaryString();
+        data = bar.readBinaryStringPooled();
     }
 
     /**

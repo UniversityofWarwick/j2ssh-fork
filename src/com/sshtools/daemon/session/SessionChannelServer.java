@@ -43,33 +43,32 @@ import java.io.*;
 
 import java.util.*;
 
-
 /**
- * @author $author$
- * @version $Revision: 1.16 $
+ * The session channel is used for many common SSH functions, such as
+ * a terminal shell and SCP. Within it is also the subsystem support,
+ * which includes subsystems like SFTP.
  */
 public class SessionChannelServer extends IOChannel {
-    private static final int MAXIMUM_PACKET_SIZE = 32648 * 2;
+    private static final int MAXIMUM_PACKET_SIZE = 32648;
 
-	private static final int MINIMUM_WINDOW_SPACE = 1024 * 16; // 16 KiB
-	private static final int MAXIMUM_WINDOW_SPACE = 524288 * 2; // 1 MiB
+	private static final int MINIMUM_WINDOW_SPACE = 1024 * 128; // 128K
+	private static final int MAXIMUM_WINDOW_SPACE = 524288 * 2; // 1M
 
 	private static Log log = LogFactory.getLog(SessionChannelServer.class);
 
-    /**  */
     public final static String SESSION_CHANNEL_TYPE = "session";
     private static Map allowedSubsystems = new HashMap();
     private Map environment = new HashMap();
     private NativeProcessProvider processInstance;
     private SubsystemServer subsystemInstance;
-    private Thread thread;
-    private IOStreamConnector ios;
+//    private Thread thread;
+//    private IOStreamConnector ios;
     private ChannelOutputStream stderrOut;
-    private InputStream stderrIn;
     private ProcessMonitorThread processMonitor;
     private PseudoTerminalWrapper pty;
     private SshAgentForwardingListener agent;
     private ServerConfiguration config;
+	private InputStream stderrIn;
 
     /**
 	 * Creates a new SessionChannelServer object.
@@ -373,50 +372,24 @@ public class SessionChannelServer extends IOChannel {
         return null;
     }
 
-    /**
- *
- *
- * @return
- */
+    
     protected int getMinimumWindowSpace() {
         return MINIMUM_WINDOW_SPACE;
     }
 
-    /**
-    * Making this too small results in timeouts
-    * on some clients. 524288 should be plenty.
-    */
+    
     protected int getMaximumWindowSpace() {
         return MAXIMUM_WINDOW_SPACE;
     }
 
-    /**
- *
- *
- * @return
- */
     protected int getMaximumPacketSize() {
         return MAXIMUM_PACKET_SIZE;
     }
-
-    /**
- *
- *
- * @return
- */
+   
     public String getChannelType() {
         return SESSION_CHANNEL_TYPE;
     }
 
-    /**
- *
- *
- * @param requestType
- * @param wantReply
- * @param requestData
- *
- * @throws IOException
- */
     protected void onChannelRequest(String requestType, boolean wantReply,
         byte[] requestData) throws IOException {
         log.debug("Channel Request received: " + requestType);

@@ -129,22 +129,13 @@ public class SubsystemMessageStore {
         }
     }
 
-    /**
-     *
-     *
-     * @param timeout
-     *
-     * @return
-     *
-     * @throws MessageStoreEOFException
-     * @throws MessageNotAvailableException
-     */
+
     public synchronized SubsystemMessage nextMessage(int timeout)
         throws MessageStoreEOFException, MessageNotAvailableException {
         // If there are no messages available then wait untill there are.
         timeout = (timeout > 0) ? timeout : 0;
 
-        while (messages.size() <= 0) {
+        while (messages.size() <= 0 && state.getValue() == OpenClosedState.OPEN) {
             try {
             	//log.debug("SSMS "+name+" - Waiting");
                 wait(timeout);
@@ -154,6 +145,8 @@ public class SubsystemMessageStore {
                 }
                 //log.debug("SSMS "+name+" AWOKEN - " + messages.size());
             } catch (InterruptedException e) {
+            	// Kicked to here when server is closing. The state should be
+            	// set to closed so 
             }
         }
 

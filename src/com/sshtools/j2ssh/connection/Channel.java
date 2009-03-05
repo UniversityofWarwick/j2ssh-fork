@@ -33,10 +33,7 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 
 /**
- * 
- * 
- * @author $author$
- * @version $Revision: 1.74 $
+ * An SSH channel. Each SSH connection supports multiple channels going through it.
  */
 public abstract class Channel {
 	private static Log log = LogFactory.getLog(Channel.class);
@@ -50,9 +47,7 @@ public abstract class Channel {
 	protected long remoteChannelId;
 	protected long remotePacketSize;
 
-	/**  */
 	protected final ChannelState state = new ChannelState();
-	private boolean isClosed = false;
 	private boolean isLocalEOF = false;
 	private boolean isRemoteEOF = false;
 	private boolean localHasClosed = false;
@@ -60,63 +55,38 @@ public abstract class Channel {
 	private String name = "Unnamed Channel";
 	private Collection<ChannelEventListener> eventListeners = new ArrayList<ChannelEventListener>();
 
-	/**
-	 * Creates a new Channel object.
-	 */
 	public Channel() {
 		this.localPacketSize = getMaximumPacketSize();
 		this.localWindow.increaseWindowSpace(getMaximumWindowSpace());
 	}
 
-	/**
-	 * 
-	 * 
-	 * @return
-	 */
 	public abstract byte[] getChannelOpenData();
 
-	/**
-	 * 
-	 * 
-	 * @return
-	 */
 	public abstract byte[] getChannelConfirmationData();
 
-	/**
-	 * 
-	 * 
-	 * @return
-	 */
 	public abstract String getChannelType();
 
 	/**
-	 * 
-	 * 
-	 * @return
+	 * Though local window space can go all the way to 0,
+	 * we will send a message to refill it as soon as it drops
+	 * below this minimum. This should help to avoid pauses
+	 * as the client waits for our window to be refilled.
 	 */
 	protected abstract int getMinimumWindowSpace();
 
-	/**
-	 * 
-	 * 
-	 * @return
-	 */
-	protected abstract int getMaximumWindowSpace();
 
-	/**
-	 * 
-	 * 
-	 * @return
-	 */
+   /**
+    * The maximum local window space to assign is the
+    * largest amount of data we can receive before needing
+    * to send back a channel window adjust message.
+    * 
+    * Making this too small results in timeouts
+    * on some clients.
+    */
+	protected abstract int getMaximumWindowSpace();
+	
 	protected abstract int getMaximumPacketSize();
 
-	/**
-	 * 
-	 * 
-	 * @param msg
-	 * 
-	 * @throws IOException
-	 */
 	protected abstract void onChannelData(SshMsgChannelData msg)
 			throws IOException;
 
@@ -131,7 +101,7 @@ public abstract class Channel {
 		if (!isClosed()) {
 			if (msg.getChannelDataLength() > localWindow.getWindowSpace()) {
 				throw new IOException(
-						"More data recieved than is allowed by the channel data window ["
+						"More data received than is allowed by the channel data window ["
 								+ name + "]");
 			}
 
@@ -143,10 +113,9 @@ public abstract class Channel {
 					log.debug("Channel " + String.valueOf(localChannelId)
 							+ " requires more window space [" + name + "]");
 				}
-				windowSpace = getMaximumWindowSpace() - windowSpace;
-				log.debug("Requesting connection protocol increase window");
-				connection.sendChannelWindowAdjust(this, windowSpace);
-				localWindow.increaseWindowSpace(windowSpace);
+				long increase = getMaximumWindowSpace() - windowSpace;
+				connection.sendChannelWindowAdjust(this, increase);
+				localWindow.increaseWindowSpace(increase);
 			}
 
 			onChannelData(msg);
@@ -189,7 +158,7 @@ public abstract class Channel {
 	 * 
 	 * @throws IOException
 	 */
-	protected/* synchronized */void sendChannelData(byte[] data)
+	protected void sendChannelData(byte[] data)
 			throws IOException {
 		if (!connection.isConnected()) {
 			throw new IOException("The connection has been closed [" + name

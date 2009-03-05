@@ -69,20 +69,10 @@ public class IOStreamConnector {
         connect(in, out);
     }
 
-    /**
-     *
-     *
-     * @return
-     */
     public IOStreamConnectorState getState() {
         return state;
     }
 
-    /**
-     *
-     *
-     * @throws IOException
-     */
     public void close() throws IOException {
         log.info("Closing IOStreamConnector");
         state.setValue(IOStreamConnectorState.CLOSED);
@@ -94,34 +84,24 @@ public class IOStreamConnector {
         if (closeOutput) {
             out.close();
         }
+        
+        //Interrupt waiting message loops so they notice everyone's going home
+        if (thread != null) {
+        	thread.interrupt();
+        }
 
         thread = null;
     }
 
-    /**
-     *
-     *
-     * @param closeInput
-     */
     public void setCloseInput(boolean closeInput) {
         this.closeInput = closeInput;
     }
 
-    /**
-     *
-     *
-     * @param closeOutput
-     */
+
     public void setCloseOutput(boolean closeOutput) {
         this.closeOutput = closeOutput;
     }
 
-    /**
-     *
-     *
-     * @param in
-     * @param out
-     */
     public void connect(InputStream in, OutputStream out) {
         this.in = in;
         this.out = out;
@@ -132,105 +112,93 @@ public class IOStreamConnector {
         thread.start();
     }
 
-    /**
-     *
-     *
-     * @return
-     */
     public long getBytes() {
         return bytes;
     }
 
-    /**
-     *
-     *
-     * @param l
-     */
     public void addIOStreamConnectorListener(IOStreamConnectorListener l) {
         listenerList.add(IOStreamConnectorListener.class, l);
     }
 
-    /**
-     *
-     *
-     * @param l
-     */
     public void removeIOStreamConnectorListener(IOStreamConnectorListener l) {
         listenerList.remove(IOStreamConnectorListener.class, l);
     }
 
     class IOStreamConnectorThread implements Runnable {
         private Log log = LogFactory.getLog(IOStreamConnectorThread.class);
-
+        
         public void run() {
-            byte[] buffer = new byte[4096];
-            int read = 0;
-            int count;
-            int available;
-            log.info("Starting IOStreamConnectorThread thread");
-
-            while (state.getValue() == IOStreamConnectorState.CONNECTED) {
-                try {
-                    // Block
-                    read = in.read(buffer, 0, 1);
-
-                    if (read > 0) {
-                        count = read;
-                        available = in.available();
-
-                        // Verify the buffer length and adjust if necersary
-                        if ((available > 0) &&
-                                ((buffer.length - 1) < available)) {
-                            byte[] tmp = new byte[available + 1];
-                            System.arraycopy(buffer, 0, tmp, 0, 1);
-                            buffer = tmp;
-                        }
-
-                        // Read the remaining available bytes of the message
-                        if (available > 0) {
-                            read = in.read(buffer, 1, available);
-                            count += read;
-                        }
-
-                        // Write the message to the output stream
-                        out.write(buffer, 0, count);
-                        bytes += count;
-
-                        // Flush it
-                        out.flush();
-
-                        // Inform all of the listeners
-                        IOStreamConnectorListener[] l = (IOStreamConnectorListener[]) listenerList.getListeners(IOStreamConnectorListener.class);
-
-                        for (int i = (l.length - 1); i >= 0; i--) {
-                            l[i].data(buffer, count);
-                        }
-                    } else {
-                        log.debug("Blocking read returned with " +
-                            String.valueOf(read));
-
-                        if (read < 0) {
-                            state.setValue(IOStreamConnectorState.EOF);
-                        }
-                    }
-                } catch (IOException ioe) {
-                    // only warn if were supposed to be still connected, as we will ignore close exceptions
-                    if (state.getValue() == IOStreamConnectorState.CONNECTED) {
-                        log.debug(ioe.getMessage());
-                        state.setValue(IOStreamConnectorState.EOF);
-                    }
-                }
-            }
-
-            try {
-                // if were not already closed then close the connector
-                if (state.getValue() != IOStreamConnectorState.CLOSED) {
-                    close();
-                }
-            } catch (IOException ioe) {
-            }
-
-            log.info("IOStreamConnectorThread is exiting");
+        	try {
+	            byte[] buffer = new byte[4096];
+	            int read = 0;
+	            int count;
+	            int available;
+	            log.info("Starting IOStreamConnectorThread thread");
+	
+	            while (state.getValue() == IOStreamConnectorState.CONNECTED) {
+	                try {
+	                    // Block
+	                    read = in.read(buffer, 0, 1);
+	
+	                    if (read > 0) {
+	                        count = read;
+	                        available = in.available();
+	
+	                        // Verify the buffer length and adjust if necersary
+	                        if ((available > 0) &&
+	                                ((buffer.length - 1) < available)) {
+	                            byte[] tmp = new byte[available + 1];
+	                            System.arraycopy(buffer, 0, tmp, 0, 1);
+	                            buffer = tmp;
+	                        }
+	
+	                        // Read the remaining available bytes of the message
+	                        if (available > 0) {
+	                            read = in.read(buffer, 1, available);
+	                            count += read;
+	                        }
+	
+	                        // Write the message to the output stream
+	                        out.write(buffer, 0, count);
+	                        bytes += count;
+	
+	                        // Flush it
+	                        out.flush();
+	                        
+	                        IOStreamConnectorListener[] l = (IOStreamConnectorListener[]) listenerList.getListeners(IOStreamConnectorListener.class);
+	                        for (int i = (l.length - 1); i >= 0; i--) {
+	                            l[i].data(buffer, read);
+	                        }
+	                    } else {
+	                        log.debug("Blocking read returned with " +
+	                            String.valueOf(read));
+	
+	                        if (read < 0) {
+	                            state.setValue(IOStreamConnectorState.EOF);
+	                        }
+	                    }
+	                } catch (IOException ioe) {
+	                    // only warn if we're supposed to be still connected, as we will ignore close exceptions
+	                    if (state.getValue() == IOStreamConnectorState.CONNECTED) {
+	                        log.debug(ioe.getMessage());
+	                        state.setValue(IOStreamConnectorState.EOF);
+	                    }
+	                }
+	            }
+	
+	            try {
+	                // if we're not already closed then close the connector
+	                if (state.getValue() != IOStreamConnectorState.CLOSED) {
+	                    close();
+	                }
+	            } catch (IOException ioe) {
+	            }
+	
+	            log.info("IOStreamConnectorThread is exiting");
+        	} catch (RuntimeException e) {
+        		log.fatal(e);
+        		throw e;
+        	}
         }
     }
 }

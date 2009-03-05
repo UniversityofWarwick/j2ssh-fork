@@ -33,10 +33,9 @@ import java.io.InputStream;
 
 
 /**
- *
- *
- * @author $author$
- * @version $Revision: 1.19 $
+ * SubsystemInputStream wraps a SubsystemMessageStore, allowing the server
+ * to read subsystem messages out as a byte stream (which it can then send
+ * as channel data to the remote host)
  */
 public class SubsystemInputStream extends InputStream {
     byte[] msgdata;
@@ -63,6 +62,11 @@ public class SubsystemInputStream extends InputStream {
         }
 
         return msgdata.length - currentPos;
+    }
+    
+    @Override
+    public void close() throws IOException {
+    	messageStore.close();
     }
 
     /**

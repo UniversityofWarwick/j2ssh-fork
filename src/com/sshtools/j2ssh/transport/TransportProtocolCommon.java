@@ -50,6 +50,7 @@ import java.nio.ByteBuffer;
 import java.nio.channels.Channels;
 
 import java.security.NoSuchAlgorithmException;
+import java.security.SecureRandom;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -407,15 +408,11 @@ implements TransportProtocol, Runnable
     }
 
     /**
-     *
-     *
-     * @param msg
-     * @param sender
-     *
-     * @throws IOException
-     * @throws TransportProtocolException
+     * Don't think this needs to be synchronized. The only critical section
+     * is sending the message to the stream, which is a single method
+     * that is itself synchronized
      */
-    public synchronized void sendMessage(SshMessage msg, Object sender)
+    public /*synchronized*/ void sendMessage(SshMessage msg, Object sender)
         throws IOException {
         // Send a message, if were in key exchange then add it to
         // the list unless of course it is a transport protocol or key
@@ -438,14 +435,12 @@ implements TransportProtocol, Runnable
 
             if (currentState == TransportProtocolState.CONNECTED) {
                 if (sendIgnore) {
-                    byte[] count = new byte[1];
-                    ConfigurationLoader.getRND().nextBytes(count);
-
-                    byte[] rand = new byte[(count[0] & 0xFF) + 1];
-                    ConfigurationLoader.getRND().nextBytes(rand);
-
+                	SecureRandom rnd = ConfigurationLoader.getRND();
+                    byte[] length = new byte[1];
+					rnd.nextBytes(length);
+					byte[] rand = new byte[(length[0] & 0xFF) + 1];
+                    rnd.nextBytes(rand);
                     SshMsgIgnore ignore = new SshMsgIgnore(new String(rand));
-
                     if (log.isDebugEnabled()) {
                         log.debug("Sending " + ignore.getMessageName());
                     }
@@ -1305,25 +1300,25 @@ implements TransportProtocol, Runnable
 
         while (state.getValue() != TransportProtocolState.DISCONNECTED) {
             
-        	if (log.isDebugEnabled()) log.debug("Getting message from input stream");
             msgdata = sshIn.readMessage();
-            if (log.isDebugEnabled()) log.debug("Got message from input stream");
 
             Integer messageId = SshMessage.getMessageId(msgdata);
 
             // First check the filter
-            for (int i = 0; i < filter.length; i++) {
-                if (filter[i] == messageId.intValue()) {
+            for (int id : filter) {
+                if (id == messageId.intValue()) {
                     if (messageStore.isRegisteredMessage(messageId)) {
-                        return messageStore.createMessage(msgdata);
+                        SshMessage message = messageStore.createMessage(msgdata);
+                        if (log.isDebugEnabled()) {
+                            log.debug("Received for transport - " + message.getMessageName());
+                        }
+						return message;
                     } else {
                         SshMessageStore ms = getMessageStore(messageId);
                         msg = ms.createMessage(msgdata);
-
                         if (log.isDebugEnabled()) {
-                            log.debug("Processing " + msg.getMessageName());
+                            log.debug("Received " + msg.getMessageName());
                         }
-
                         return msg;
                     }
                 }

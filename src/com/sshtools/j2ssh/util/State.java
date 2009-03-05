@@ -77,7 +77,7 @@ public abstract class State {
      *
      * @return
      */
-    public synchronized int getValue() {
+    public int getValue() {
         return state;
     }
 

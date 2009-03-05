@@ -146,7 +146,7 @@ class TransportProtocolOutputStream {
                 mac = hmac.generate(sequenceNo, packet, 0, packet.length);
             }
 
-            // Perfrom encrpytion
+            // Perfrom encryption
             if (cipher != null) {
                 packet = cipher.transform(packet);
             }
@@ -166,7 +166,6 @@ class TransportProtocolOutputStream {
 
             // Send!
             out.write(message.toByteArray());
-
             out.flush();
 
             // Increment the sequence no
@@ -181,7 +180,6 @@ class TransportProtocolOutputStream {
                     ioe.getMessage());
             }
         } finally {
-        	log.debug("Releasing algorithms");
             algorithms.release();
         }
     }

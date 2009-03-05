@@ -81,6 +81,9 @@ public abstract class SubsystemMessage {
     public abstract void constructMessage(ByteArrayReader bar)
         throws InvalidMessageException, IOException;
 
+    // Called when totally finished with this message. Allows it to clean itself up.
+    public void finish() {}
+    
     /**
      *
      *

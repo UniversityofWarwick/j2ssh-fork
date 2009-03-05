@@ -1,4 +1,4 @@
-/*
+ /*
  *  SSHTools - Java SSH2 API
  *
  *  Copyright (C) 2002-2003 Lee David Painter and Contributors.
@@ -25,6 +25,7 @@
  */
 package com.sshtools.j2ssh.subsystem;
 
+import com.sshtools.j2ssh.StaticBytePool;
 import com.sshtools.j2ssh.connection.*;
 import com.sshtools.j2ssh.io.*;
 import com.sshtools.j2ssh.transport.*;
@@ -121,7 +122,7 @@ public abstract class SubsystemChannel extends Channel {
 
         int read;
         byte[] tmp = new byte[4];
-        byte[] msgdata;
+        byte[] msgdata = null;
 
         // Now process any outstanding messages
         while (buffer.getInputStream().available() > 4) {
@@ -136,7 +137,13 @@ public abstract class SubsystemChannel extends Channel {
             }
 
             if (buffer.getInputStream().available() >= nextMessageLength) {
-                msgdata = new byte[nextMessageLength];
+            	// Try to reuse byte arrays as much as possible
+            	if (msgdata == null || msgdata.length != nextMessageLength) {
+            		if (msgdata != null) {
+            			StaticBytePool.recycle(msgdata);
+            		}
+            		msgdata = StaticBytePool.get(nextMessageLength);
+            	}
                 buffer.getInputStream().read(msgdata);
                 messageStore.addMessage(msgdata);
                 nextMessageLength = -1;

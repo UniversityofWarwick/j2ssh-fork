@@ -41,7 +41,7 @@ import java.io.IOException;
  */
 public class SshMsgChannelClose extends SshMessage {
     /**  */
-    protected final static int SSH_MSG_CHANNEL_CLOSE = 97;
+    public final static int SSH_MSG_CHANNEL_CLOSE = 97;
 
     // The recipient channel id
     private long recipientChannel;

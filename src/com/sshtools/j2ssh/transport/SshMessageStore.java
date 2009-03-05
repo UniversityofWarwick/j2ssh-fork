@@ -53,7 +53,7 @@ public final class SshMessageStore {
     private static Log log = LogFactory.getLog(SshMessageStore.class);
 
     // List to hold messages as they are received
-    private List messages = new ArrayList();
+    private List<SshMessage> messages = new ArrayList<SshMessage>();
     private Map<Integer,Class<SshMessage>> register = new HashMap<Integer,Class<SshMessage>>();
     private boolean isClosed = false;
     private int[] singleIdFilter = new int[1];
@@ -197,7 +197,7 @@ public final class SshMessageStore {
     public synchronized SshMessage popMessage(int messageId)
         throws MessageStoreEOFException, InterruptedException {
         try {
-            return getMessage(messageId, 0);
+            return popMessage(messageId, 0);
         } catch (MessageNotAvailableException e) {
             // This should never happen by throw jsut in case
             throw new MessageStoreEOFException();
@@ -224,7 +224,7 @@ public final class SshMessageStore {
      *
      * @since 0.2.0
      */
-    public synchronized SshMessage getMessage(int messageId, int timeout)
+    public synchronized SshMessage popMessage(int messageId, int timeout)
         throws MessageStoreEOFException, MessageNotAvailableException, 
             InterruptedException {
         singleIdFilter[0] = messageId;
@@ -325,7 +325,7 @@ public final class SshMessageStore {
     public synchronized void addMessage(SshMessage msg)
         throws MessageNotRegisteredException {
         // Add the message
-        messages.add(messages.size(), msg);
+        messages.add(msg);
 
         synchronized (listeners) {
             if (listeners.size() > 0) {
@@ -450,7 +450,7 @@ public final class SshMessageStore {
             return msg;
         }
 
-        // If were willing to wait the wait and look again
+        // If we're willing to wait then wait and look again
         if (timeout > 0) {
             if (log.isDebugEnabled()) {
                 log.debug("No message so waiting for " +

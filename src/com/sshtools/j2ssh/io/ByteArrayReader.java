@@ -30,6 +30,8 @@ import java.io.IOException;
 
 import java.math.BigInteger;
 
+import com.sshtools.j2ssh.StaticBytePool;
+
 
 /**
  *
@@ -136,18 +138,30 @@ public class ByteArrayReader extends ByteArrayInputStream {
         return new BigInteger(raw);
     }
 
-    /**
-     *
-     *
-     * @return
-     *
-     * @throws IOException
-     */
     public byte[] readBinaryString() throws IOException {
         long len = readInt();
+        if (len < 0) {
+        	// The client is sending nonsense.
+        	throw new IOException("Invalid string data, had a negative length");
+        }
         byte[] raw = new byte[(int) len];
         read(raw);
-
+        return raw;
+    }
+    
+    /**
+     * Read a string into an array
+     */
+    public byte[] readBinaryStringPooled() throws IOException {
+        int len = (int)readInt();
+        if (len == -1) {
+        	len = 0; // KDE sends -1 sometimes. I don't know why.
+        } else if (len < 0) {
+        	// The client is sending nonsense.
+        	throw new IOException("Invalid string data, had a negative length");
+        }
+        byte[] raw = StaticBytePool.get(len);
+        read(raw);
         return raw;
     }
 
@@ -160,6 +174,11 @@ public class ByteArrayReader extends ByteArrayInputStream {
      */
     public String readString() throws IOException {
         long len = readInt();
+        if (len < 0) {
+        	// The client is sending nonsense.
+        	throw new IOException("Invalid string data, had a negative length");
+        }
+        
         byte[] raw = new byte[(int) len];
         read(raw);
 

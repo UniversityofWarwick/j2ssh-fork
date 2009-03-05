@@ -160,9 +160,7 @@ public class ConfigurationLoader {
 
     /**
      * <p>
-     * Initializes the J2SSH api with a specified configuration context. This
-     * method will attempt to load the Bouncycastle JCE if it detects the java
-     * version is 1.3.1.
+     * Initializes the J2SSH api with a specified configuration context.
      * </p>
      *
      * @param force force the configuration to load even if a configuration
@@ -174,49 +172,12 @@ public class ConfigurationLoader {
      */
     public static void initialize(boolean force, ConfigurationContext context)
         throws ConfigurationException {
-        try {
-            String javaversion = System.getProperty("java.version");
-            log.info("JAVA version is " + javaversion);
-
-            if (javaversion.startsWith("1.3")) {
-                boolean provider = false;
-
-                for (int i = 0; i < Security.getProviders().length; i++) {
-                    log.info(Security.getProviders()[i].getName() +
-                        " security provider found");
-
-                    if (Security.getProviders()[i].getClass().getName().equals("org.bouncycastle.jce.provider.BouncyCastleProvider")) {
-                        provider = true;
-                    }
-                }
-
-                if (provider == false) {
-                    log.info("Attempting to load the bouncycastle jce provider");
-
-                    // Attempt to load a JCE Provider - replace or remove these statements
-                    // depending upon how you want to initialize your JCE provider
-                    Class cls = Class.forName(
-                            "org.bouncycastle.jce.provider.BouncyCastleProvider");
-                    java.security.Security.addProvider((java.security.Provider) cls.newInstance());
-                }
-            }
-        } catch (Exception ex) {
-            log.info("Failed to load the bouncycastle jce provider", ex);
-
-            if (java.security.Security.getProviders().length <= 0) {
-                throw new ConfigurationException(
-                    "There are no security providers available; install jce-jdk13-119.jar available from http://www.bouncycastle.org");
-            } else {
-                log.info("An existing provider has been detected");
-            }
-        }
 
         synchronized (initializationLock) {
             if (initialized && !force) {
                 return;
             }
 
-            //   }
             context.initialize();
             contexts.add(context);
 
