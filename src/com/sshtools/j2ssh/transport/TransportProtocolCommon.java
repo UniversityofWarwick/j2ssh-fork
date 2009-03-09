@@ -69,7 +69,7 @@ import java.util.Vector;
 public abstract class TransportProtocolCommon
 implements TransportProtocol, Runnable 
 {
-    // Flag to keep on running
+	// Flag to keep on running
     //private boolean keepRunning = true;
 
     /**  */
@@ -141,6 +141,17 @@ implements TransportProtocol, Runnable
 
     /**  */
     protected byte[] signature = null;
+    
+    /**
+     * There is a bug in key re-exchange that appears when there is a lot
+     * of traffic during rekeying. Until the bug is fixed, it will instead
+     * delay rekeying until the connection has been quiet for this many milliseconds.
+     * 
+     * Shouldn't be too long otherwise client IGNORE messages and other occasional
+     * traffic might stop rekeying from happening.
+     */
+    private static final int REKEY_QUIET_WAIT_TIME = 1000;
+    
     private Vector<TransportProtocolEventHandler> eventHandlers = new Vector<TransportProtocolEventHandler>();
 
     // Storage of messages whilst in key exchange
@@ -162,11 +173,15 @@ implements TransportProtocol, Runnable
 
     // The thread object
     private SshThread thread;
-    private long kexTimeout = 3600000L;
+    private long kexTimeout = 3600000L; // 1 hour
+    //private long kexTimeout = 60000L;
     // private long kexTransferLimitKB = 100L; // 100 K
     private long kexTransferLimitKB = 1073741824L/1024L;
     // private long kexTransferLimit = 1073741824L;
     private long startTime = System.currentTimeMillis();
+    
+    private long lastMessage = startTime;
+    
     private long transferredKB   = 0;
     private long lastTriggeredKB = 0;
 
@@ -407,12 +422,7 @@ implements TransportProtocol, Runnable
       log.debug("The Transport Protocol has been stopped");
     }
 
-    /**
-     * Don't think this needs to be synchronized. The only critical section
-     * is sending the message to the stream, which is a single method
-     * that is itself synchronized
-     */
-    public /*synchronized*/ void sendMessage(SshMessage msg, Object sender)
+    public synchronized void sendMessage(SshMessage msg, Object sender)
         throws IOException {
         // Send a message, if were in key exchange then add it to
         // the list unless of course it is a transport protocol or key
@@ -807,6 +817,7 @@ implements TransportProtocol, Runnable
         // Lock the outgoing algorithms so nothing else is sent untill
         // weve updated them with the new keys
         algorithmsOut.lock();
+        algorithmsIn.lock();
 
         // Do we need to hold the algorithmsOut lock during
         // the input message handling below? If not, then the 
@@ -830,6 +841,7 @@ implements TransportProtocol, Runnable
         }
         finally {
             if( ! hasReleasedLock ) {
+            	algorithmsIn.lock();
                 algorithmsOut.release();
             }
         }
@@ -886,8 +898,8 @@ implements TransportProtocol, Runnable
             clientKexInit = null;
             serverKexInit = null;
 
-            //algorithmsIn.release();
             algorithmsOut.release();
+            algorithmsIn.release();
             hasReleasedLock = true;
 
             /*
@@ -933,6 +945,7 @@ implements TransportProtocol, Runnable
         }
         finally {
             if( ! hasReleasedLock ) {
+            	algorithmsIn.release();
                 algorithmsOut.release();
             }
         }
@@ -998,6 +1011,8 @@ implements TransportProtocol, Runnable
         sendKeyExchangeInit();
 
         SshMessage msg;
+        
+        log.debug("Rekey time limit is " + kexTimeout + "ms");
 
         // Perform a transport protocol message loop
         while (state.getValue() != TransportProtocolState.DISCONNECTED) {
@@ -1242,6 +1257,11 @@ implements TransportProtocol, Runnable
         }
     }
 
+    /** 
+     * A request from the remote machine to exchange fresh keys.
+     * 
+     * See processMessages for locally initiated key exchange.
+     */
     private void onMsgKexInit(SshMsgKexInit msg) throws IOException {
         log.debug("Received remote key exchange init message");
         log.debug(msg.toString());
@@ -1271,6 +1291,7 @@ implements TransportProtocol, Runnable
                 // We need to take this lock since
                 // it is released in completeKeyExchange.
                 algorithmsOut.lock();
+                algorithmsIn.lock();
                 completeKeyExchange();
             } else {
                 completeOnNewKeys = new Boolean(true);
@@ -1381,13 +1402,19 @@ implements TransportProtocol, Runnable
             long kbLimit = transferredKB - lastTriggeredKB; 
             
             if (((currentTime - startTime) > kexTimeout) ||
-                (kbLimit > kexTransferLimitKB) ) {
-              startTime     = currentTime;
-              lastTriggeredKB = transferredKB;
-              if (log.isDebugEnabled()) {
-                log.debug("rekey");
+                (kbLimit > kexTransferLimitKB)) {
+              if (currentTime > lastMessage + REKEY_QUIET_WAIT_TIME) {
+	              startTime     = currentTime;
+	              lastTriggeredKB = transferredKB;
+	              if (log.isDebugEnabled()) {
+	                log.debug("rekey");
+	              }              
+	              sendKeyExchangeInit();
+              } else {
+            	  if (log.isDebugEnabled()) {
+  	                log.debug("no rekey yet, waiting til less busy");
+  	              }
               }
-              sendKeyExchangeInit();
             }
             
             boolean hasmsg = false;
@@ -1403,6 +1430,8 @@ implements TransportProtocol, Runnable
                     }
                 }
             }
+            
+            this.lastMessage = currentTime;
 
             Integer messageId = SshMessage.getMessageId(msgdata);
 

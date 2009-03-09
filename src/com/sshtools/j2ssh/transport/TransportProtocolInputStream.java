@@ -26,6 +26,7 @@
 package com.sshtools.j2ssh.transport;
 
 import java.io.BufferedInputStream;
+import java.io.EOFException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InterruptedIOException;
@@ -177,7 +178,7 @@ class TransportProtocolInputStream {
 
                 int bytesRead = read;
                 if (read < 0) {
-                	throw new IOException("The socket is EOF");
+                	throw new EOFException("No more data on socket");
                 }
                 endpos += bytesRead;
             }

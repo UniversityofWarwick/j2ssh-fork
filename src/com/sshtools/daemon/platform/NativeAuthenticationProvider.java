@@ -40,7 +40,7 @@ import java.io.*;
  * @author $author$
  * @version $Revision: 1.13 $
  */
-public abstract class NativeAuthenticationProvider {
+public abstract class NativeAuthenticationProvider { 
     private static Log log = LogFactory.getLog(NativeAuthenticationProvider.class);
     private static Class cls;
     private static NativeAuthenticationProvider instance;
