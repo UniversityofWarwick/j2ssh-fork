@@ -32,6 +32,8 @@ import java.net.ServerSocket;
 import java.net.Socket;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
+import java.util.Collection;
+import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
 
@@ -162,7 +164,7 @@ public abstract class SshServer {
             int len = client.getInputStream().read();
             byte[] msg = new byte[len];
             client.getInputStream().read(msg);
-            stopServer(new String(msg));
+            stopServer(new String(msg, "UTF8"));
         }
     }
 
@@ -389,4 +391,8 @@ public abstract class SshServer {
             }
         }
     }
+
+	public final Collection<TransportProtocolServer> getActiveConnections() {
+		return Collections.unmodifiableCollection(activeConnections);
+	}
 }

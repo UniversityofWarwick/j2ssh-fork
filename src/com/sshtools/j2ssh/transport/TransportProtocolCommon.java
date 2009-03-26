@@ -25,6 +25,25 @@
  */
 package com.sshtools.j2ssh.transport;
 
+import java.io.EOFException;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InterruptedIOException;
+import java.math.BigInteger;
+import java.nio.ByteBuffer;
+import java.nio.channels.Channels;
+import java.security.NoSuchAlgorithmException;
+import java.security.SecureRandom;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.Vector;
+
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+
 import com.sshtools.j2ssh.SshException;
 import com.sshtools.j2ssh.SshThread;
 import com.sshtools.j2ssh.configuration.ConfigurationLoader;
@@ -36,28 +55,6 @@ import com.sshtools.j2ssh.transport.kex.KeyExchangeException;
 import com.sshtools.j2ssh.transport.kex.SshKeyExchange;
 import com.sshtools.j2ssh.transport.kex.SshKeyExchangeFactory;
 import com.sshtools.j2ssh.util.Hash;
-
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
-
-import java.io.EOFException;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.InterruptedIOException;
-
-import java.math.BigInteger;
-import java.nio.ByteBuffer;
-import java.nio.channels.Channels;
-
-import java.security.NoSuchAlgorithmException;
-import java.security.SecureRandom;
-
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
-import java.util.Vector;
 
 
 /**
@@ -163,11 +160,6 @@ implements TransportProtocol, Runnable
     // Key exchange lock for accessing the kex init messages
     private Object kexLock = new Object();
 
-    // Object to synchronize key changing
-    private Object keyLock = new Object();
-
-    // The connected socket
-    //private Socket socket;
     // The underlying transport provider
     TransportProvider provider;
 
@@ -257,11 +249,11 @@ implements TransportProtocol, Runnable
         }
 
         try {
-            state.setValue(TransportProtocolState.DISCONNECTED);
-            state.setDisconnectReason(description);
-
             // Send the disconnect message automatically
             sendDisconnect(SshMsgDisconnect.BY_APPLICATION, description);
+            
+            state.setValue(TransportProtocolState.DISCONNECTED);
+            state.setDisconnectReason(description);
         } catch (Exception e) {
             log.warn("Failed to send disconnect", e);
         }
@@ -408,20 +400,23 @@ implements TransportProtocol, Runnable
         if (e instanceof IOException) {
           state.setLastError((IOException) e);
         }
-        
-        if (state.getValue() != TransportProtocolState.DISCONNECTED) {
-          log.error("The Transport Protocol thread failed", e);
-          stop();
-        }
+        log.error("The Transport Protocol thread failed", e);
       } finally {
         thread = null;
-        //http://sourceforge.net/tracker/index.php?func=detail&aid=870122&group_id=60894&atid=495562
-        state.setValue(TransportProtocolState.DISCONNECTED);
+        if (state.getValue() != TransportProtocolState.DISCONNECTED) {
+        	//stop() sets state to disconnected.
+            stop();
+        }
       }
       
       log.debug("The Transport Protocol has been stopped");
     }
 
+    /**
+     * Send a message to the remote host. After this method has finished
+     * the message will have been fully written to the output stream and
+     * flushed.
+     */
     public synchronized void sendMessage(SshMessage msg, Object sender)
         throws IOException {
         // Send a message, if were in key exchange then add it to
@@ -764,10 +759,8 @@ implements TransportProtocol, Runnable
         throws IOException;
 
     /**
-     *
-     *
-     * @param reason
-     * @param description
+     * Send a disconnect message with a description, and then
+     * stop everything.
      */
     protected void sendDisconnect(int reason, String description) {
         SshMsgDisconnect msg = new SshMsgDisconnect(reason, description, "");
@@ -1002,8 +995,6 @@ implements TransportProtocol, Runnable
     }
 
     /**
-     *
-     *
      * @throws IOException
      */
     protected void startBinaryPacketProtocol() throws IOException {
@@ -1062,45 +1053,61 @@ implements TransportProtocol, Runnable
     }
 
     /**
-     *
+     * Stop all activity on this transport - catch and log errors where
+     * possible - it's better to carry on and try to close everything
+     * else than just fail and stop.
      */
-    protected final void stop() {
-        onDisconnect();
-
-        Iterator it = eventHandlers.iterator();
-        TransportProtocolEventHandler eventHandler;
-
-        while (it.hasNext()) {
-            eventHandler = (TransportProtocolEventHandler) it.next();
-            eventHandler.onDisconnect(this);
+    protected synchronized final void stop() {
+    	if (state.getValue() == TransportProtocolState.DISCONNECTED) {
+    		log.info("Skipping stop() as we are already disconnected");
+    		return;
+    	}
+    	
+    	log.info("Disconnecting");
+    	
+    	try {
+	        onDisconnect();
+	
+	        for (TransportProtocolEventHandler eventHandler : eventHandlers) {
+	            eventHandler.onDisconnect(this);
+	        }
+	
+	        // Close the input/output streams
+	        //sshIn.close();
+	        if (messageStore != null) {
+	        	try {
+	        		messageStore.close();
+				} catch (Exception e) {
+					log.warn(e);
+				}
+	        }
+	
+	        // 05/01/2003 moiz change begin:
+	        // all close all the registerd messageStores
+	        for (SshMessageStore ms : messageStores){
+	            try {
+	                ms.close();
+	            } catch (Exception e) {
+	            	log.warn(e);
+	            }
+	        }
+	        messageStores.clear();
+	        // 05/01/2003 moizd change end:
+	        messageStore = null;
+	
+	        try {
+	        	log.info("Closing transport provider");
+	            provider.close();
+	        } catch (IOException ioe) {
+	        	log.warn(ioe);
+	        }
+    	} catch (Exception e) {
+    		//Log the exception, but carry on execution because it's more
+    		//important we finish cleaning up and close the connection.
+    		log.error("Error during stop()", e);
+    	} finally {
+        	state.setValue(TransportProtocolState.DISCONNECTED);
         }
-
-        // Close the input/output streams
-        //sshIn.close();
-        if (messageStore != null) {
-            messageStore.close();
-        }
-
-        // 05/01/2003 moiz change begin:
-        // all close all the registerd messageStores
-        for (SshMessageStore ms : messageStores){
-            try {
-                ms.close();
-            } catch (Exception e) {
-            }
-        }
-
-        messageStores.clear();
-
-        // 05/01/2003 moizd change end:
-        messageStore = null;
-
-        try {
-        	log.info("Closing transport provider");
-            provider.close();
-        } catch (IOException ioe) {
-        }
-	state.setValue(TransportProtocolState.DISCONNECTED);
     }
 
     private byte[] makeSshKey(char chr) throws IOException {
@@ -1245,9 +1252,9 @@ implements TransportProtocol, Runnable
     private void onMsgDisconnect(SshMsgDisconnect msg)
         throws IOException {
         log.info("The remote computer disconnected: " + msg.getDescription());
+        stop();
         state.setValue(TransportProtocolState.DISCONNECTED);
         state.setDisconnectReason(msg.getDescription());
-        stop();
     }
 
     private void onMsgIgnore(SshMsgIgnore msg) {

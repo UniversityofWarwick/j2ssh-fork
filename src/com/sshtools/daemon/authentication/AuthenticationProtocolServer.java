@@ -25,20 +25,35 @@
  */
 package com.sshtools.daemon.authentication;
 
-import com.sshtools.daemon.configuration.*;
-import com.sshtools.daemon.platform.*;
+import java.io.IOException;
+import java.io.InputStream;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+
+import com.sshtools.daemon.configuration.ServerConfiguration;
+import com.sshtools.daemon.platform.NativeAuthenticationProvider;
 import com.sshtools.daemon.util.StringUtil;
-
-import com.sshtools.j2ssh.*;
-import com.sshtools.j2ssh.authentication.*;
-import com.sshtools.j2ssh.configuration.*;
-import com.sshtools.j2ssh.transport.*;
-
-import org.apache.commons.logging.*;
-
-import java.io.*;
-
-import java.util.*;
+import com.sshtools.j2ssh.SshException;
+import com.sshtools.j2ssh.SshThread;
+import com.sshtools.j2ssh.authentication.AuthenticationProtocolException;
+import com.sshtools.j2ssh.authentication.AuthenticationProtocolState;
+import com.sshtools.j2ssh.authentication.SshMsgUserAuthBanner;
+import com.sshtools.j2ssh.authentication.SshMsgUserAuthFailure;
+import com.sshtools.j2ssh.authentication.SshMsgUserAuthRequest;
+import com.sshtools.j2ssh.authentication.SshMsgUserAuthSuccess;
+import com.sshtools.j2ssh.configuration.ConfigurationLoader;
+import com.sshtools.j2ssh.io.ByteArrayReader;
+import com.sshtools.j2ssh.transport.AsyncService;
+import com.sshtools.j2ssh.transport.Service;
+import com.sshtools.j2ssh.transport.SshMessage;
+import com.sshtools.j2ssh.transport.SshMessageStore;
+import com.sshtools.j2ssh.transport.TransportProtocolState;
 
 
 /**
@@ -185,8 +200,7 @@ public class AuthenticationProtocolServer extends AsyncService {
                     in.read(data);
                     in.close();
 
-                    SshMsgUserAuthBanner bannerMsg = new SshMsgUserAuthBanner(new String(
-                                data));
+                    SshMsgUserAuthBanner bannerMsg = new SshMsgUserAuthBanner(new String(data, ByteArrayReader.UTF_8));
                     transport.sendMessage(bannerMsg, this);
                 } else {
                     log.info("The banner file '" + bannerFile +

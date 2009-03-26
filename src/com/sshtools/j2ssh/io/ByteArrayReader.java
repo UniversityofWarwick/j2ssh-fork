@@ -27,7 +27,7 @@ package com.sshtools.j2ssh.io;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
-
+import java.io.UnsupportedEncodingException;
 import java.math.BigInteger;
 
 import com.sshtools.j2ssh.StaticBytePool;
@@ -40,7 +40,9 @@ import com.sshtools.j2ssh.StaticBytePool;
  * @version $Revision: 1.16 $
  */
 public class ByteArrayReader extends ByteArrayInputStream {
-    /**
+    public static final String UTF_8 = "UTF8";
+
+	/**
      * Creates a new ByteArrayReader object.
      *
      * @param data
@@ -116,11 +118,19 @@ public class ByteArrayReader extends ByteArrayInputStream {
      * @return
      */
     public static String readString(byte[] data, int start) {
-        int len = (int) readInt(data, start);
-        byte[] chars = new byte[(int) len];
+        int len = (int)readInt(data, start);
+        if (len < 0) {
+			throw new IllegalArgumentException("Invalid data, had a negative length");
+		} else if (start + len > data.length) {
+			throw new IllegalArgumentException("Invalid data, length greater than available data");
+		}
+        byte[] chars = new byte[len];
         System.arraycopy(data, start + 4, chars, 0, len);
-
-        return new String(chars);
+        try {
+			return new String(chars, UTF_8);
+		} catch (UnsupportedEncodingException e) {
+			throw new IllegalStateException("Can't find UTF-8 encoding!!", e);
+		}
     }
 
     /**
@@ -131,7 +141,8 @@ public class ByteArrayReader extends ByteArrayInputStream {
      * @throws IOException
      */
     public BigInteger readBigInteger() throws IOException {
-        int len = (int) readInt();
+        int len = (int)readInt();
+        verifyLength(len);
         byte[] raw = new byte[len];
         read(raw);
 
@@ -139,12 +150,9 @@ public class ByteArrayReader extends ByteArrayInputStream {
     }
 
     public byte[] readBinaryString() throws IOException {
-        long len = readInt();
-        if (len < 0) {
-        	// The client is sending nonsense.
-        	throw new IOException("Invalid string data, had a negative length");
-        }
-        byte[] raw = new byte[(int) len];
+        int len = (int)readInt();
+        verifyLength(len);
+        byte[] raw = new byte[len];
         read(raw);
         return raw;
     }
@@ -156,32 +164,36 @@ public class ByteArrayReader extends ByteArrayInputStream {
         int len = (int)readInt();
         if (len == -1) {
         	len = 0; // KDE sends -1 sometimes. I don't know why.
-        } else if (len < 0) {
-        	// The client is sending nonsense.
-        	throw new IOException("Invalid string data, had a negative length");
+        } else {
+        	verifyLength(len);
         }
         byte[] raw = StaticBytePool.get(len);
         read(raw);
         return raw;
     }
 
-    /**
-     *
-     *
-     * @return
-     *
-     * @throws IOException
-     */
+   
     public String readString() throws IOException {
-        long len = readInt();
-        if (len < 0) {
-        	// The client is sending nonsense.
-        	throw new IOException("Invalid string data, had a negative length");
-        }
+        int len = (int)readInt();
+        verifyLength(len);
         
-        byte[] raw = new byte[(int) len];
+        byte[] raw = new byte[len];
         read(raw);
 
-        return new String(raw);
+        return new String(raw, UTF_8);
     }
+    
+    /**
+     * Ensure that the bytes read as length are valid, by checking it is
+     * a positive number and that it's less than or equal to the actual amount
+     * of data available.
+     */
+    private final void verifyLength(final int len) throws IOException {
+		if (len < 0) {
+			// The client is sending nonsense.
+			throw new IOException("Invalid data, had a negative length");
+		} else if (len > available()) {
+			throw new IOException("Invalid data, length greater than available data");
+		}
+	}
 }

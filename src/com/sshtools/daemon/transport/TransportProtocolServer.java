@@ -25,10 +25,30 @@
  */
 package com.sshtools.daemon.transport;
 
-import com.sshtools.daemon.configuration.ServerConfiguration;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
 
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+
+import com.sshtools.daemon.configuration.ServerConfiguration;
 import com.sshtools.j2ssh.configuration.ConfigurationLoader;
-import com.sshtools.j2ssh.transport.*;
+import com.sshtools.j2ssh.transport.AlgorithmInitializationException;
+import com.sshtools.j2ssh.transport.AlgorithmNotAgreedException;
+import com.sshtools.j2ssh.transport.AlgorithmNotSupportedException;
+import com.sshtools.j2ssh.transport.AlgorithmOperationException;
+import com.sshtools.j2ssh.transport.MessageAlreadyRegisteredException;
+import com.sshtools.j2ssh.transport.Service;
+import com.sshtools.j2ssh.transport.SshMessage;
+import com.sshtools.j2ssh.transport.SshMsgDisconnect;
+import com.sshtools.j2ssh.transport.SshMsgKexInit;
+import com.sshtools.j2ssh.transport.SshMsgServiceRequest;
+import com.sshtools.j2ssh.transport.TransportProtocolCommon;
+import com.sshtools.j2ssh.transport.TransportProtocolException;
 import com.sshtools.j2ssh.transport.cipher.SshCipher;
 import com.sshtools.j2ssh.transport.cipher.SshCipherFactory;
 import com.sshtools.j2ssh.transport.hmac.SshHmac;
@@ -37,17 +57,6 @@ import com.sshtools.j2ssh.transport.kex.KeyExchangeException;
 import com.sshtools.j2ssh.transport.kex.SshKeyExchange;
 import com.sshtools.j2ssh.transport.publickey.SshKeyPairFactory;
 import com.sshtools.j2ssh.transport.publickey.SshPrivateKey;
-
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
-
-import java.io.IOException;
-
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
 
 
 /**
@@ -387,11 +396,10 @@ public class TransportProtocolServer extends TransportProtocolCommon {
  */
     protected void onMessageReceived(SshMessage msg) throws IOException {
         switch (msg.getMessageId()) {
-        case SshMsgServiceRequest.SSH_MSG_SERVICE_REQUEST: {
-            onMsgServiceRequest((SshMsgServiceRequest) msg);
-
-            break;
-        }
+	        case SshMsgServiceRequest.SSH_MSG_SERVICE_REQUEST: {
+	            onMsgServiceRequest((SshMsgServiceRequest) msg);
+	            break;
+	        }
         }
     }
 

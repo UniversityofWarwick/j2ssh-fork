@@ -49,11 +49,16 @@
 // ===========================================================================
 package com.sshtools.daemon.util;
 
-import java.io.*;
-
-import java.text.*;
-
-import java.util.*;
+import java.io.PrintWriter;
+import java.io.StringWriter;
+import java.text.CharacterIterator;
+import java.text.StringCharacterIterator;
+import java.util.ArrayList;
+import java.util.Hashtable;
+import java.util.List;
+import java.util.Map;
+import java.util.Properties;
+import java.util.StringTokenizer;
 
 
 /**
