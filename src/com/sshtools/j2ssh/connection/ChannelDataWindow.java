@@ -92,16 +92,16 @@ public class ChannelDataWindow {
      * @return
      */
     public synchronized long consumeWindowSpace(int count) {
-        if (windowSpace < count) {
-        	if (actuallyWait) {
-        		waitForWindowSpace(count);
-        	} else {
-        		if (log.isInfoEnabled()) {
-	        		log.info(name+": NOT waiting for " + String.valueOf(count) +
-	                        " bytes of window space");
-        		}
-        	}
-        }
+//        if (windowSpace < count) {
+//        	if (actuallyWait) {
+//        		waitForWindowSpace(count);
+//        	} else {
+//        		if (log.isInfoEnabled()) {
+//	        		log.info(name+": NOT waiting for " + String.valueOf(count) +
+//	                        " bytes of window space");
+//        		}
+//        	}
+//        }
 
         windowSpace -= count;
 

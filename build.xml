@@ -78,43 +78,62 @@
 
 	<target name="build" depends="compile, test">
 		<mkdir dir="dist/lib" />
-
+		
+		<tstamp />
+	
 		<!-- Build the J2SSH library files -->
-		<jar jarfile="dist/lib/j2ssh-core-${j2ssh.version.major}.${j2ssh.version.minor}.${j2ssh.version.build}.jar" basedir="${build.dist.classes}">
+		<jar jarfile="dist/lib/j2ssh-core-${DSTAMP}.jar" basedir="${build.dist.classes}">
 			<include name="com/sshtools/j2ssh/**/*.class" />
 			<manifest>
-				<attribute name="Product-Version"
-                         value="${j2ssh.version.major}.${j2ssh.version.minor}.${j2ssh.version.build}"/>
+				<attribute name="Product-Version" value="${j2ssh.version.major}.${j2ssh.version.minor}.${j2ssh.version.build}"/>
+				<attribute name="DSTAMP" value="${DSTAMP}" />
 			</manifest>
 		</jar>
 
-		<jar jarfile="dist/lib/j2ssh-ant-${j2ssh.version.major}.${j2ssh.version.minor}.${j2ssh.version.build}.jar" basedir="${build.dist.classes}">
+		<jar jarfile="dist/lib/j2ssh-ant-${DSTAMP}.jar" basedir="${build.dist.classes}">
 			<include name="com/sshtools/ant/**/*.class"/>
 			<manifest>
-				<attribute name="Product-Version"
-                         value="${j2ssh.version.major}.${j2ssh.version.minor}.${j2ssh.version.build}"/>
+				<attribute name="Product-Version" value="${j2ssh.version.major}.${j2ssh.version.minor}.${j2ssh.version.build}"/>
+				<attribute name="DSTAMP" value="${DSTAMP}" />
 			</manifest>
 		</jar>
 
-		<jar jarfile="dist/lib/j2ssh-daemon-${j2ssh.version.major}.${j2ssh.version.minor}.${j2ssh.version.build}.jar" basedir="${build.dist.classes}">
+		<jar jarfile="dist/lib/j2ssh-daemon-${DSTAMP}.jar" basedir="${build.dist.classes}">
 			<include name="com/sshtools/daemon/**/*.class"/>
 			<exclude name="com/sshtools/daemon/windows/**/*.*"/>
 			<exclude name="com/sshtools/daemon/linux/**/*.*"/>
 			<manifest>
-				<attribute name="Product-Version" 
-                         value="${j2ssh.version.major}.${j2ssh.version.minor}.${j2ssh.version.build}"/>
+				<attribute name="Product-Version" value="${j2ssh.version.major}.${j2ssh.version.minor}.${j2ssh.version.build}"/>
+				<attribute name="DSTAMP" value="${DSTAMP}" />
 			</manifest>
 		</jar>
 
-		<jar jarfile="dist/lib/j2ssh-common-${j2ssh.version.major}.${j2ssh.version.minor}.${j2ssh.version.build}.jar" basedir="${build.dist.classes}">
+		<jar jarfile="dist/lib/j2ssh-common-${DSTAMP}.jar" basedir="${build.dist.classes}">
 			<include name="com/sshtools/common/**/*.class"/>
 			<include name="com/sshtools/common/**/*.png"/>
 			<include name="com/sshtools/common/**/*.gif"/>
 			<manifest>
-				<attribute name="Product-Version"
-                         value="${j2ssh.version.major}.${j2ssh.version.minor}.${j2ssh.version.build}"/>
+				<attribute name="Product-Version" value="${j2ssh.version.major}.${j2ssh.version.minor}.${j2ssh.version.build}"/>
+				<attribute name="DSTAMP" value="${DSTAMP}" />
 			</manifest>
 		</jar>
+		
+		<jar jarfile="dist/lib/j2ssh-server.jar" basedir="${build.dist.classes}">
+			<include name="com/sshtools/common/**/*.class"/>
+			<include name="com/sshtools/j2ssh/**/*.class" />
+			<include name="com/sshtools/daemon/**/*.class"/>
+			<exclude name="com/sshtools/daemon/windows/**/*.*" />
+			<exclude name="com/sshtools/daemon/linux/**/*.*" />
+			<manifest>
+				<attribute name="Product-Version" value="${j2ssh.version.major}.${j2ssh.version.minor}.${j2ssh.version.build}"/>
+				<attribute name="DSTAMP" value="${DSTAMP}" />
+			</manifest>
+		</jar>
+		
+		<copyfile dest="dist/lib/j2ssh-common.jar" src="dist/lib/j2ssh-common-${DSTAMP}.jar"/>
+		<copyfile dest="dist/lib/j2ssh-daemon.jar" src="dist/lib/j2ssh-daemon-${DSTAMP}.jar"/>
+		<copyfile dest="dist/lib/j2ssh-core.jar" src="dist/lib/j2ssh-core-${DSTAMP}.jar"/>
+		<copyfile dest="dist/lib/j2ssh-ant.jar" src="dist/lib/j2ssh-ant-${DSTAMP}.jar"/>
 	</target>
 
 	<!-- JAVADOCS TARGET -->

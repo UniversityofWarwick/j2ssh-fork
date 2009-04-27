@@ -25,17 +25,25 @@
  */
 package com.sshtools.daemon.subsystem;
 
-import com.sshtools.daemon.session.*;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 
-import com.sshtools.j2ssh.*;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+
+import com.sshtools.daemon.session.SessionChannelServer;
+import com.sshtools.j2ssh.SshThread;
+import com.sshtools.j2ssh.io.UnsignedInteger32;
 import com.sshtools.j2ssh.sftp.IncompleteMessage;
-import com.sshtools.j2ssh.subsystem.*;
-import com.sshtools.j2ssh.transport.*;
-import com.sshtools.j2ssh.util.*;
-
-import org.apache.commons.logging.*;
-
-import java.io.*;
+import com.sshtools.j2ssh.sftp.SshFxpStatus;
+import com.sshtools.j2ssh.sftp.UnrecognizedMessage;
+import com.sshtools.j2ssh.subsystem.SubsystemInputStream;
+import com.sshtools.j2ssh.subsystem.SubsystemMessage;
+import com.sshtools.j2ssh.subsystem.SubsystemMessageStore;
+import com.sshtools.j2ssh.subsystem.SubsystemOutputStream;
+import com.sshtools.j2ssh.transport.MessageStoreEOFException;
+import com.sshtools.j2ssh.util.StartStopState;
 
 
 /**
@@ -104,10 +112,19 @@ public abstract class SubsystemServer implements Runnable {
             while (state.getValue() == StartStopState.STARTED) {
                 SubsystemMessage msg = incoming.nextMessage();
                 if (msg != null) {
-                	try {
-                		onMessageReceived(msg);
-                	} finally {
-                		msg.finish();
+                	if (msg instanceof UnrecognizedMessage) {
+                		log.info("Returning FX_OP_UNSUPPORTED to unrecognized message type");
+                		UnrecognizedMessage badMsg = (UnrecognizedMessage) msg;
+                		SshFxpStatus statusMsg = new SshFxpStatus(badMsg.getId(),
+                                new UnsignedInteger32(SshFxpStatus.STATUS_FX_OP_UNSUPPORTED),
+                                "Unrecognized message type", "");
+                		sendMessage(statusMsg);
+                	} else {
+	                	try {
+	                		onMessageReceived(msg);
+	                	} finally {
+	                		msg.finish();
+	                	}
                 	}
                 } else {
                 	log.debug("Null message");
@@ -161,10 +178,10 @@ public abstract class SubsystemServer implements Runnable {
     }
 
     /**
- *
- *
- * @param msg
- */
+	 *
+	 *
+	 * @param msg
+	 */
     protected abstract void onMessageReceived(SubsystemMessage msg);
 
     /**

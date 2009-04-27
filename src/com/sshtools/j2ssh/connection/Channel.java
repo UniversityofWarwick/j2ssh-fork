@@ -39,7 +39,8 @@ public abstract class Channel {
 	private static Log log = LogFactory.getLog(Channel.class);
 
 	protected ChannelDataWindow localWindow = new ChannelDataWindow("local");
-	protected ChannelDataWindow remoteWindow = new ChannelDataWindow("remote", true);
+	protected ChannelDataWindow remoteWindow = new ChannelDataWindow("remote");
+	
 	protected ConnectionProtocol connection;
 
 	protected long localChannelId;
@@ -57,7 +58,9 @@ public abstract class Channel {
 
 	public Channel() {
 		this.localPacketSize = getMaximumPacketSize();
-		this.localWindow.increaseWindowSpace(getMaximumWindowSpace());
+		
+		// Used to set local window size here, but this made it impossible for subclasses to set up values in their
+		// constructor.
 	}
 
 	public abstract byte[] getChannelOpenData();
@@ -99,12 +102,13 @@ public abstract class Channel {
 	 */
 	protected synchronized void processChannelData(SshMsgChannelData msg) throws IOException {
 		if (!isClosed()) {
-			if (msg.getChannelDataLength() > localWindow.getWindowSpace()) {
-				throw new IOException(
-						"More data received than is allowed by the channel data window ["
-								+ name + "]");
-			}
-
+			/**
+			 * We aren't handling where there is more data than window space.
+			 * We are just carrying on (and letting the space drop below zero)
+			 * because there's no real reason to stop. A window adjust message
+			 * will get sent to replenish the window, and then everything
+			 * will be fine.
+			 */
 			long windowSpace = localWindow.consumeWindowSpace(msg
 					.getChannelData().length);
 
@@ -114,8 +118,8 @@ public abstract class Channel {
 							+ " requires more window space [" + name + "]");
 				}
 				long increase = getMaximumWindowSpace() - windowSpace;
-				connection.sendChannelWindowAdjust(this, increase);
 				localWindow.increaseWindowSpace(increase);
+				connection.sendChannelWindowAdjust(this, increase);
 			}
 
 			onChannelData(msg);
@@ -226,12 +230,12 @@ public abstract class Channel {
 	protected void processChannelData(SshMsgChannelExtendedData msg)
 			throws IOException {
 		synchronized (state) {
-			if (msg.getChannelData().length > localWindow.getWindowSpace()) {
-				throw new IOException(
-						"More data recieved than is allowed by the channel data window ["
-								+ name + "]");
-			}
-
+//			if (msg.getChannelData().length > localWindow.getWindowSpace()) {
+//				throw new IOException(
+//						"More data received than is allowed by the channel data window ["
+//								+ name + "]");
+//			}
+			
 			long windowSpace = localWindow.consumeWindowSpace(msg
 					.getChannelData().length);
 
@@ -241,9 +245,9 @@ public abstract class Channel {
 							+ " requires more window space [" + name + "]");
 				}
 
-				windowSpace = getMaximumWindowSpace() - windowSpace;
-				connection.sendChannelWindowAdjust(this, windowSpace);
-				localWindow.increaseWindowSpace(windowSpace);
+				long increase = getMaximumWindowSpace() - windowSpace;
+				localWindow.increaseWindowSpace(increase);
+				connection.sendChannelWindowAdjust(this, increase);
 			}
 
 			onChannelExtData(msg);
@@ -459,6 +463,8 @@ public abstract class Channel {
 	protected void init(ConnectionProtocol connection, long localChannelId,
 			long senderChannelId, long initialWindowSize, long maximumPacketSize)
 			throws IOException {
+		this.localWindow.increaseWindowSpace(getMaximumWindowSpace());
+		
 		this.localChannelId = localChannelId;
 		this.remoteChannelId = senderChannelId;
 		this.remotePacketSize = maximumPacketSize;

@@ -238,9 +238,6 @@ public abstract class SshServer {
  
     protected abstract void shutdown(String msg);
 
-    /**
-     * 
-     */
     protected abstract void configureServices(ConnectionProtocol connection)
         throws IOException;
 
@@ -306,7 +303,6 @@ public abstract class SshServer {
                 SocketChannel socketChannel;
                 maxConnections = ConfigurationLoader.getConfiguration(ServerConfiguration.class).getMaxConnections();
 
-                boolean refuse = false;
                 TransportProtocolEventHandler eventHandler = new TransportProtocolEventAdapter() {
                     public void onDisconnect(TransportProtocol transport) {
                         // Remove from our active channels list only if

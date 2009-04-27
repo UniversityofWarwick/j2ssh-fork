@@ -25,7 +25,7 @@
  */
 package com.sshtools.j2ssh.configuration;
 
-import com.sshtools.j2ssh.*;
+import com.sshtools.j2ssh.SshException;
 
 
 /**
@@ -42,5 +42,9 @@ public class ConfigurationException extends SshException {
      */
     public ConfigurationException(String msg) {
         super(msg);
+    }
+    
+    public ConfigurationException(Exception e) {
+    	super(e);
     }
 }

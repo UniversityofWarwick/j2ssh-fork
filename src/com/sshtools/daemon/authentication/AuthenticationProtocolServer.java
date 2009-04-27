@@ -48,6 +48,7 @@ import com.sshtools.j2ssh.authentication.SshMsgUserAuthFailure;
 import com.sshtools.j2ssh.authentication.SshMsgUserAuthRequest;
 import com.sshtools.j2ssh.authentication.SshMsgUserAuthSuccess;
 import com.sshtools.j2ssh.configuration.ConfigurationLoader;
+import com.sshtools.j2ssh.connection.ConnectionProtocol;
 import com.sshtools.j2ssh.io.ByteArrayReader;
 import com.sshtools.j2ssh.transport.AsyncService;
 import com.sshtools.j2ssh.transport.Service;
@@ -63,7 +64,10 @@ import com.sshtools.j2ssh.transport.TransportProtocolState;
  * @version $Revision: 1.11 $
  */
 public class AuthenticationProtocolServer extends AsyncService {
-    private static Log log = LogFactory.getLog(AuthenticationProtocolServer.class);
+	
+    public static final String SERVICE_NAME = "ssh-userauth";
+	private static final Log log = LogFactory.getLog(AuthenticationProtocolServer.class);
+	
     private List completedAuthentications = new ArrayList();
     private Map acceptServices = new HashMap();
     private List<String> availableAuths;
@@ -77,7 +81,7 @@ public class AuthenticationProtocolServer extends AsyncService {
  * Creates a new AuthenticationProtocolServer object.
  */
     public AuthenticationProtocolServer() {
-        super("ssh-userauth");
+        super(SERVICE_NAME);
         messageFilter[0] = SshMsgUserAuthRequest.SSH_MSG_USERAUTH_REQUEST;
     }
 
@@ -348,4 +352,12 @@ public class AuthenticationProtocolServer extends AsyncService {
             }
         }
     }
+
+	public ConnectionProtocol getConnectionProtocol() {
+		ConnectionProtocol protocol = (ConnectionProtocol) acceptServices.get(ConnectionProtocol.SERVICE_NAME);
+		if (protocol == null) {
+			log.warn("No connection protocol found on authentication protocol");
+		}
+		return protocol;
+	}
 }

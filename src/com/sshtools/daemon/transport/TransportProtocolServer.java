@@ -27,6 +27,7 @@ package com.sshtools.daemon.transport;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -35,8 +36,10 @@ import java.util.Map;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 
+import com.sshtools.daemon.authentication.AuthenticationProtocolServer;
 import com.sshtools.daemon.configuration.ServerConfiguration;
 import com.sshtools.j2ssh.configuration.ConfigurationLoader;
+import com.sshtools.j2ssh.connection.ConnectionProtocol;
 import com.sshtools.j2ssh.transport.AlgorithmInitializationException;
 import com.sshtools.j2ssh.transport.AlgorithmNotAgreedException;
 import com.sshtools.j2ssh.transport.AlgorithmNotSupportedException;
@@ -70,6 +73,8 @@ public class TransportProtocolServer extends TransportProtocolCommon {
     private Map acceptServices = new HashMap();
     private ServerConfiguration config;
     private boolean refuse = false;
+    
+    private Date createDate = new Date();
 
     /**
  * Creates a new TransportProtocolServer object.
@@ -108,6 +113,37 @@ public class TransportProtocolServer extends TransportProtocolCommon {
  */
     public void acceptService(Service service) throws IOException {
         acceptServices.put(service.getServiceName(), service);
+    }
+    
+    /**
+     * There is no explicit binding from transport layer to authentication layer,
+     * but we ALWAYS configure the transport protocol to accept new authentication
+     * services, so just get it from there.
+     * 
+     * Prepare to be returned null in the event no authentication is set up for some reason.
+     */
+    public AuthenticationProtocolServer getAuthenticationProtocolServer() {
+    	AuthenticationProtocolServer server = (AuthenticationProtocolServer) acceptServices.get(AuthenticationProtocolServer.SERVICE_NAME);
+    	if (server == null) {
+    		log.warn("This layer has no authentication layer attached");
+    	}
+    	return server;
+    }
+    
+    /**
+     * This gets the connection protocol via the authentication protocol. Any transport
+     * layer accepting connections should return a value, but you should still be prepared
+     * for a null return value.
+     */
+    public ConnectionProtocol getConnectionProtocol() {
+    	AuthenticationProtocolServer authServer = getAuthenticationProtocolServer();
+    	if (authServer == null) {
+    		log.warn("Can't get connection protocol as there is no authentication protocol to get it from");
+    		return null;
+    	} else {
+    		return authServer.getConnectionProtocol();
+    	}
+
     }
 
     /**
@@ -274,10 +310,8 @@ public class TransportProtocolServer extends TransportProtocolCommon {
     }
 
     /**
- *
- *
- * @return
- */
+     * The client ID sent by the remote host when connecting.
+     */
     public String getRemoteId() {
         return clientIdent;
     }
@@ -453,4 +487,17 @@ public class TransportProtocolServer extends TransportProtocolCommon {
                 msg.getServiceName() + " is not available");
         }
     }
+    
+    public boolean isUnderlyingConnectionAlive() {
+    	try {
+			return getProvider().getReadableByteChannel().isOpen();
+		} catch (IOException e) {
+			log.error("Error checking if connection is alive", e);
+			return false;
+		}
+    }
+
+	public Date getCreatedDate() {
+		return createDate;
+	}
 }

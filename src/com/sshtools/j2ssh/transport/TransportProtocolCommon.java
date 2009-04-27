@@ -161,7 +161,7 @@ implements TransportProtocol, Runnable
     private Object kexLock = new Object();
 
     // The underlying transport provider
-    TransportProvider provider;
+    private TransportProvider provider;
 
     // The thread object
     private SshThread thread;
@@ -190,6 +190,8 @@ implements TransportProtocol, Runnable
 
     //private Map registeredMessages = new HashMap();
     private Vector<SshMessageStore> messageStores = new Vector<SshMessageStore>();
+    
+	private long messagesReceived;
 
     /**
      * Creates a new TransportProtocolCommon object.
@@ -251,7 +253,7 @@ implements TransportProtocol, Runnable
         try {
             // Send the disconnect message automatically
             sendDisconnect(SshMsgDisconnect.BY_APPLICATION, description);
-            
+            stop();
             state.setValue(TransportProtocolState.DISCONNECTED);
             state.setDisconnectReason(description);
         } catch (Exception e) {
@@ -403,10 +405,7 @@ implements TransportProtocol, Runnable
         log.error("The Transport Protocol thread failed", e);
       } finally {
         thread = null;
-        if (state.getValue() != TransportProtocolState.DISCONNECTED) {
-        	//stop() sets state to disconnected.
-            stop();
-        }
+        stop();
       }
       
       log.debug("The Transport Protocol has been stopped");
@@ -1066,11 +1065,13 @@ implements TransportProtocol, Runnable
     	log.info("Disconnecting");
     	
     	try {
-	        onDisconnect();
-	
-	        for (TransportProtocolEventHandler eventHandler : eventHandlers) {
-	            eventHandler.onDisconnect(this);
-	        }
+    		try {
+    			onDisconnect();
+    		} finally {
+		        for (TransportProtocolEventHandler eventHandler : eventHandlers) {
+		            eventHandler.onDisconnect(this);
+		        }
+    		}
 	
 	        // Close the input/output streams
 	        //sshIn.close();
@@ -1253,7 +1254,6 @@ implements TransportProtocol, Runnable
         throws IOException {
         log.info("The remote computer disconnected: " + msg.getDescription());
         stop();
-        state.setValue(TransportProtocolState.DISCONNECTED);
         state.setDisconnectReason(msg.getDescription());
     }
 
@@ -1442,6 +1442,8 @@ implements TransportProtocol, Runnable
 
             Integer messageId = SshMessage.getMessageId(msgdata);
 
+            messagesReceived++;
+            
             if (!messageStore.isRegisteredMessage(messageId)) {
                 try {
                     ms = getMessageStore(messageId);
@@ -1491,12 +1493,15 @@ implements TransportProtocol, Runnable
         throw new MessageNotRegisteredException(messageId);
     }
 
-    /**
-     *
-     *
-     * @param ms
-     */
     public void removeMessageStore(SshMessageStore ms) {
         messageStores.remove(ms);
     }
+
+	public TransportProvider getProvider() {
+		return provider;
+	}
+
+	public long getMessagesReceived() {
+		return messagesReceived;
+	}
 }

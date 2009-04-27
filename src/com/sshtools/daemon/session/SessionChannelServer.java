@@ -25,23 +25,32 @@
  */
 package com.sshtools.daemon.session;
 
-import com.sshtools.daemon.configuration.*;
-import com.sshtools.daemon.platform.*;
-import com.sshtools.daemon.scp.*;
-import com.sshtools.daemon.subsystem.*;
+import java.io.File;
+import java.io.IOException;
+import java.io.InputStream;
+import java.util.HashMap;
+import java.util.Map;
 
-import com.sshtools.j2ssh.*;
-import com.sshtools.j2ssh.agent.*;
-import com.sshtools.j2ssh.configuration.*;
-import com.sshtools.j2ssh.connection.*;
-import com.sshtools.j2ssh.io.*;
-import com.sshtools.j2ssh.util.*;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 
-import org.apache.commons.logging.*;
-
-import java.io.*;
-
-import java.util.*;
+import com.sshtools.daemon.configuration.AllowedSubsystem;
+import com.sshtools.daemon.configuration.ServerConfiguration;
+import com.sshtools.daemon.platform.NativeProcessProvider;
+import com.sshtools.daemon.scp.ScpServer;
+import com.sshtools.daemon.subsystem.SubsystemServer;
+import com.sshtools.j2ssh.SshThread;
+import com.sshtools.j2ssh.agent.SshAgentForwardingListener;
+import com.sshtools.j2ssh.configuration.ConfigurationException;
+import com.sshtools.j2ssh.configuration.ConfigurationLoader;
+import com.sshtools.j2ssh.connection.ChannelOutputStream;
+import com.sshtools.j2ssh.connection.IOChannel;
+import com.sshtools.j2ssh.connection.InvalidChannelException;
+import com.sshtools.j2ssh.connection.SshMsgChannelExtendedData;
+import com.sshtools.j2ssh.io.ByteArrayReader;
+import com.sshtools.j2ssh.io.ByteArrayWriter;
+import com.sshtools.j2ssh.io.IOStreamConnector;
+import com.sshtools.j2ssh.util.StartStopState;
 
 /**
  * The session channel is used for many common SSH functions, such as
@@ -53,6 +62,9 @@ public class SessionChannelServer extends IOChannel {
 
 	private static final int MINIMUM_WINDOW_SPACE = 1024 * 128; // 128K
 	private static final int MAXIMUM_WINDOW_SPACE = 524288 * 2; // 1M
+	
+	private final int minimumWindowSpace;
+	private final int maximumWindowSpace;
 
 	private static Log log = LogFactory.getLog(SessionChannelServer.class);
 
@@ -82,6 +94,9 @@ public class SessionChannelServer extends IOChannel {
         // Load the allowed subsystems from the server configuration
         config = (ServerConfiguration) ConfigurationLoader.getConfiguration(ServerConfiguration.class);
         allowedSubsystems.putAll(config.getSubsystems());
+        
+        minimumWindowSpace = config.getMinimumWindowSpace();
+        maximumWindowSpace = config.getMaximumWindowSpace();
     }
 
     private void bindStderrInputStream(InputStream stderrIn) {
@@ -374,12 +389,12 @@ public class SessionChannelServer extends IOChannel {
 
     
     protected int getMinimumWindowSpace() {
-        return MINIMUM_WINDOW_SPACE;
+        return minimumWindowSpace;
     }
 
     
     protected int getMaximumWindowSpace() {
-        return MAXIMUM_WINDOW_SPACE;
+        return maximumWindowSpace;
     }
 
     protected int getMaximumPacketSize() {

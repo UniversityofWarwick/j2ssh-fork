@@ -27,9 +27,7 @@ package com.sshtools.j2ssh.connection;
 
 import java.io.IOException;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Map;
-import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 import org.apache.commons.logging.Log;
@@ -50,8 +48,9 @@ import com.sshtools.j2ssh.transport.TransportProtocolState;
  * @version $Revision: 1.68 $
  */
 public class ConnectionProtocol extends AsyncService {
-    private static Log log = LogFactory.getLog(ConnectionProtocol.class);
-    private Set<Long> reusableChannels = new HashSet<Long>();
+    public static final String SERVICE_NAME = "ssh-connection";
+	private static Log log = LogFactory.getLog(ConnectionProtocol.class);
+    //private Set<Long> reusableChannels = new HashSet<Long>();
     private Map<Long,Channel> activeChannels = new ConcurrentHashMap<Long,Channel>();
     private Map<String,ChannelFactory> allowedChannels = new HashMap<String,ChannelFactory>();
     private Map<String,GlobalRequestHandler> globalRequests = new HashMap<String, GlobalRequestHandler>();
@@ -61,7 +60,7 @@ public class ConnectionProtocol extends AsyncService {
      * Creates a new ConnectionProtocol object.
      */
     public ConnectionProtocol() {
-        super("ssh-connection");
+        super(SERVICE_NAME);
     }
 
     /**
@@ -134,11 +133,11 @@ public class ConnectionProtocol extends AsyncService {
     }
 
     private Long getChannelId() {
-            if (reusableChannels.size() <= 0) {
+            //if (reusableChannels.size() <= 0) {
                 return new Long(nextChannelId++);
-            } else {
-                return (Long) reusableChannels.iterator().next();
-            }
+            //} else {
+            //    return (Long) reusableChannels.iterator().next();
+            //}
     }
 
     /**
@@ -939,5 +938,10 @@ public class ConnectionProtocol extends AsyncService {
 
         Long channelId = new Long(channel.getLocalChannelId());
         activeChannels.remove(channelId);
+    }
+    
+    
+    public int getChannelCount() {
+    	return activeChannels.size();
     }
 }

@@ -25,20 +25,19 @@
  */
 package com.sshtools.j2ssh.subsystem;
 
-import com.sshtools.j2ssh.io.ByteArrayWriter;
-import com.sshtools.j2ssh.transport.InvalidMessageException;
-import com.sshtools.j2ssh.transport.MessageNotAvailableException;
-import com.sshtools.j2ssh.transport.MessageStoreEOFException;
-import com.sshtools.j2ssh.util.OpenClosedState;
-
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
-
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+
+import com.sshtools.j2ssh.sftp.UnrecognizedMessage;
+import com.sshtools.j2ssh.transport.InvalidMessageException;
+import com.sshtools.j2ssh.transport.MessageNotAvailableException;
+import com.sshtools.j2ssh.transport.MessageStoreEOFException;
+import com.sshtools.j2ssh.util.OpenClosedState;
 
 
 /**
@@ -53,7 +52,7 @@ public class SubsystemMessageStore {
     // List to hold messages as they are received
 
     /**  */
-    protected List messages = new ArrayList();
+    protected List<SubsystemMessage> messages = new ArrayList<SubsystemMessage>();
 
     // Map to hold message implementation classes
 
@@ -96,13 +95,15 @@ public class SubsystemMessageStore {
         try {
             Class impl = (Class) registeredMessages.get(new Integer(msgdata[0]));
 
+            SubsystemMessage msg;
             if (impl == null) {
-                throw new InvalidMessageException("The message with id " +
-                    String.valueOf(msgdata[0]) + " is not implemented");
+                msg = new UnrecognizedMessage();
+                msg.fromByteArray(msgdata);
+                if (log.isDebugEnabled()) log.debug("Received unrecognised message type " + ((UnrecognizedMessage)msg).getId());                
+            } else {
+	            msg = (SubsystemMessage) impl.newInstance();
+	            msg.fromByteArray(msgdata);
             }
-
-            SubsystemMessage msg = (SubsystemMessage) impl.newInstance();
-            msg.fromByteArray(msgdata);
             addMessage(msg);
 
             return;

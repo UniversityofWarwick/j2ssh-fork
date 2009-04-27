@@ -25,21 +25,30 @@
  */
 package com.sshtools.daemon.configuration;
 
-import com.sshtools.daemon.session.*;
+import java.io.File;
+import java.io.IOException;
+import java.io.InputStream;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
 
-import com.sshtools.j2ssh.configuration.*;
-import com.sshtools.j2ssh.transport.publickey.*;
+import javax.xml.parsers.ParserConfigurationException;
+import javax.xml.parsers.SAXParser;
+import javax.xml.parsers.SAXParserFactory;
 
-import org.apache.commons.logging.*;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+import org.xml.sax.Attributes;
+import org.xml.sax.SAXException;
+import org.xml.sax.helpers.DefaultHandler;
 
-import org.xml.sax.*;
-import org.xml.sax.helpers.*;
-
-import java.io.*;
-
-import java.util.*;
-
-import javax.xml.parsers.*;
+import com.sshtools.daemon.session.SessionChannelServer;
+import com.sshtools.j2ssh.configuration.ConfigurationLoader;
+import com.sshtools.j2ssh.transport.publickey.InvalidSshKeyException;
+import com.sshtools.j2ssh.transport.publickey.SshPrivateKey;
+import com.sshtools.j2ssh.transport.publickey.SshPrivateKeyFile;
 
 
 /**
@@ -65,6 +74,8 @@ public class ServerConfiguration extends DefaultHandler {
     private String authenticationBanner = "";
     private boolean allowTcpForwarding = true;
     private String currentElement = null;
+    private int minimumWindowSpace;
+    private int maximumWindowSpace;
     private Class sessionChannelImpl = SessionChannelServer.class;
 
     /**
@@ -107,6 +118,9 @@ public class ServerConfiguration extends DefaultHandler {
         authenticationBanner = "";
         allowTcpForwarding = true;
         currentElement = null;
+        
+        minimumWindowSpace = 1024 * 1024; // 1MB
+        maximumWindowSpace = 1024 * 1024 * 3; // 3MB
 
         SAXParserFactory saxFactory = SAXParserFactory.newInstance();
         SAXParser saxParser = saxFactory.newSAXParser();
@@ -189,7 +203,9 @@ public class ServerConfiguration extends DefaultHandler {
                         !qname.equals("RequiredAuthentication") &&
                         !qname.equals("AuthorizationFile") &&
                         !qname.equals("UserConfigDirectory") &&
-                        !qname.equals("AllowTcpForwarding")) {
+                        !qname.equals("AllowTcpForwarding") &&
+                        !qname.equals("MinimumWindowSpace") &&
+                        !qname.equals("MaximumWindowSpace")) {
                     throw new SAXException("Unexpected <" + qname +
                         "> element after SshAPIConfiguration");
                 }
@@ -258,6 +274,12 @@ public class ServerConfiguration extends DefaultHandler {
                 log.debug("MaxAuthentications=" + value);
             } else if (currentElement.equals("AllowTcpForwarding")) {
                 allowTcpForwarding = Boolean.valueOf(value).booleanValue();
+            } else if (currentElement.equals("MinimumWindowSpace")) {
+            	minimumWindowSpace = Integer.parseInt(value);
+            	log.debug("MinimumWindowSpace set to " + minimumWindowSpace);
+            } else if (currentElement.equals("MaximumWindowSpace")) {
+            	maximumWindowSpace = Integer.parseInt(value);
+            	log.debug("MaximumWindowSpace set to " + maximumWindowSpace);
             }
         }
     }
@@ -292,7 +314,9 @@ public class ServerConfiguration extends DefaultHandler {
                     currentElement.equals("RequiredAuthentication") ||
                     currentElement.equals("AuthorizationFile") ||
                     currentElement.equals("UserConfigDirectory") ||
-                    currentElement.equals("AllowTcpForwarding")) {
+                    currentElement.equals("AllowTcpForwarding") ||
+                    currentElement.equals("MinimumWindowSpace") ||
+                    currentElement.equals("MaximumWindowSpace")) {
                 currentElement = "ServerConfiguration";
             }
         } else {
@@ -431,77 +455,102 @@ public class ServerConfiguration extends DefaultHandler {
  * @return
  */
     public String toString() {
-        String xml = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n";
-        xml += "<!-- Server configuration file - If filenames are not absolute they are assummed to be in the same directory as this configuration file. -->\n";
-        xml += "<ServerConfiguration>\n";
-        xml += "   <!-- The available host keys for server authentication -->\n";
+        StringBuilder xml = new StringBuilder("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n");
+        xml.append("<!-- Server configuration file - If filenames are not absolute they are assummed to be in the same directory as this configuration file. -->\n");
+        xml.append("<ServerConfiguration>\n");
+        xml.append("   <!-- The available host keys for server authentication -->\n");
 
         Map.Entry entry;
         Iterator it = serverHostKeys.entrySet().iterator();
 
         while (it.hasNext()) {
             entry = (Map.Entry) it.next();
-            xml += ("   <ServerHostKey PrivateKeyFile=\"" + entry.getValue() +
+            xml.append("   <ServerHostKey PrivateKeyFile=\"" + entry.getValue() +
             "\"/>\n");
         }
 
-        xml += "   <!-- Add any number of subsystem elements here -->\n";
+        xml.append("   <!-- Add any number of subsystem elements here -->\n");
 
         AllowedSubsystem subsystem;
         it = allowedSubsystems.entrySet().iterator();
 
         while (it.hasNext()) {
             subsystem = (AllowedSubsystem) ((Map.Entry) it.next()).getValue();
-            xml += ("   <Subsystem Name=\"" + subsystem.getName() +
+            xml.append("   <Subsystem Name=\"" + subsystem.getName() +
             "\" Type=\"" + subsystem.getType() + "\" Provider=\"" +
             subsystem.getProvider() + "\"/>\n");
         }
 
-        xml += "   <!-- Display the following authentication banner before authentication -->\n";
-        xml += ("   <AuthenticationBanner>" + authenticationBanner +
+        xml.append("   <!-- Display the following authentication banner before authentication -->\n");
+        xml.append("   <AuthenticationBanner>" + authenticationBanner +
         "</AuthenticationBanner>\n");
-        xml += "   <!-- The maximum number of connected sessions available -->\n";
-        xml += ("   <MaxConnections>" + String.valueOf(maxConnections) +
+        xml.append("   <!-- The maximum number of connected sessions available -->\n");
+        xml.append("   <MaxConnections>" + String.valueOf(maxConnections) +
         "</MaxConnections>\n");
-        xml += "   <!-- The maximum number of authentication attemtps for each connection -->\n";
-        xml += ("   <MaxAuthentications>" + String.valueOf(maxAuthentications) +
-        "</MaxAuthentications>\n");
-        xml += "   <!-- Bind to the following address to listen for connections -->\n";
-        xml += ("   <ListenAddress>" + listenAddress + "</ListenAddress>\n");
-        xml += "   <!-- The port to listen to -->\n";
-        xml += ("   <Port>" + String.valueOf(port) + "</Port>\n");
-        xml += "   <!-- Listen on the following port (on localhost) for server commands such as stop -->\n";
-        xml += ("   <CommandPort>" + String.valueOf(commandPort) +
+        xml.append("   <!-- The maximum number of authentication attemtps for each connection -->\n");
+        element(xml, "MaxAuthentications", maxAuthentications);
+        xml.append("   <!-- Bind to the following address to listen for connections -->\n");
+        element(xml, "ListenAddress", listenAddress);
+        xml.append("   <!-- The port to listen to -->\n");
+        element(xml, "Port", port);
+        xml.append("   <!-- Listen on the following port (on localhost) for server commands such as stop -->\n");
+        xml.append("   <CommandPort>" + String.valueOf(commandPort) +
         "</CommandPort>\n");
-        xml += "   <!-- Specify the executable that provides the default shell -->\n";
-        xml += ("   <TerminalProvider>" + terminalProvider +
+        xml.append("   <!-- Specify the executable that provides the default shell -->\n");
+        xml.append("   <TerminalProvider>" + terminalProvider +
         "</TerminalProvider>\n");
-        xml += "   <!-- Specify any number of allowed authentications -->\n";
+        xml.append("   <!-- Specify any number of allowed authentications -->\n");
         it = allowedAuthentications.iterator();
 
         while (it.hasNext()) {
-            xml += ("   <AllowedAuthentication>" + it.next().toString() +
+            xml.append("   <AllowedAuthentication>" + it.next().toString() +
             "</AllowedAuthentication>\n");
         }
 
-        xml += "   <!-- Specify any number of required authentications -->\n";
-        it = requiredAuthentications.iterator();
-
-        while (it.hasNext()) {
-            xml += ("   <RequiredAuthentication>" + it.next().toString() +
+        xml.append("   <!-- Specify any number of required authentications -->\n");
+        for (String auth : requiredAuthentications) {
+            xml .append("   <RequiredAuthentication>" + auth +
             "</RequiredAuthentication>\n");
         }
 
-        xml += "   <!-- The users authorizations file -->\n";
-        xml += ("   <AuthorizationFile>" + authorizationFile +
+        xml.append("   <!-- The users authorizations file -->\n");
+        xml.append("   <AuthorizationFile>" + authorizationFile +
         "</AuthorizationFile>\n");
-        xml += "   <!-- The users configuration directory where files such as AuthorizationFile are found. For users home directory specify %D For users name specify %U  -->\n";
-        xml += ("   <UserConfigDirectory>" + userConfigDirectory +
-        "</UserConfigDirectory>\n");
-        xml += ("<AllowTcpForwarding>" + String.valueOf(allowTcpForwarding) +
-        "</AllowTcpForwarding>\n");
-        xml += "</ServerConfiguration>\n";
+        xml.append("   <!-- The users configuration directory where files such as AuthorizationFile are found. For users home directory specify %D For users name specify %U  -->\n");
+        xml.append("   <UserConfigDirectory>" + userConfigDirectory + "</UserConfigDirectory>\n");
+        xml.append("   <AllowTcpForwarding>" + String.valueOf(allowTcpForwarding) + "</AllowTcpForwarding>\n");
+        
+        comment(xml, "Window space limits for session channel server");
+        element(xml, "MinimumWindowSpace", minimumWindowSpace);
+        element(xml, "MaximumWindowSpace", maximumWindowSpace);
+        
+        xml.append("</ServerConfiguration>\n");
 
-        return xml;
+        return xml.toString();
     }
+
+	public final int getMinimumWindowSpace() {
+		return minimumWindowSpace;
+	}
+
+	public final int getMaximumWindowSpace() {
+		return maximumWindowSpace;
+	}
+	
+	private static void comment(final StringBuilder sb, final String comment) {
+		sb.append("  <!-- ");
+		sb.append(comment);
+		sb.append("-->\n");
+	}
+	
+	private static void element(final StringBuilder sb, final String name, final Object value) {
+		sb.append("  <");
+		sb.append(name);
+		sb.append(">\n");
+        sb.append(value);
+        sb.append("\n");
+        sb.append("  </");
+		sb.append(name);
+		sb.append(">\n");
+	}
 }
