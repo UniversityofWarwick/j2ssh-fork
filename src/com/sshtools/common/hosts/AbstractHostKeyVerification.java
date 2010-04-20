@@ -86,8 +86,8 @@ public abstract class AbstractHostKeyVerification extends DefaultHandler
         }
     }
 
-    private List deniedHosts = new ArrayList();
-    private Map allowedHosts = new HashMap();
+    private List<String> deniedHosts = new ArrayList<String>();
+    private Map<String, String> allowedHosts = new HashMap<String, String>();
     private String hostFile;
     private boolean hostFileWriteable;
     private boolean expectEndElement = false;

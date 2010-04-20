@@ -39,7 +39,7 @@ import org.apache.commons.logging.LogFactory;
  * calls release()
  */
 public class TransportProtocolAlgorithmSync {
-    private static Log log = LogFactory.getLog(TransportProtocolAlgorithmSync.class);
+    //private static Log log = LogFactory.getLog(TransportProtocolAlgorithmSync.class);
     private SshCipher cipher = null;
     private SshCompression compression = null;
     private SshHmac hmac = null;

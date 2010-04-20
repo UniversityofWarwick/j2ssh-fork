@@ -252,15 +252,7 @@ public class ConfigurationLoader {
         }
     }
 
-    /**
-     *
-     *
-     * @param cls
-     *
-     * @return
-     *
-     * @throws ConfigurationException
-     */
+
     @SuppressWarnings("unchecked")
 	public static <T> T getConfiguration(Class<T> cls)
         throws ConfigurationException {

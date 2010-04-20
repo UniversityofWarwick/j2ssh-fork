@@ -89,9 +89,11 @@ class TransportProtocolOutputStream {
      */
     protected synchronized void sendMessage(SshMessage msg)
         throws TransportProtocolException {
+    	boolean locked = false;
         try {
             // Get the algorithm objects
             algorithms.lock();
+            locked = true;
 
             SshCipher cipher = algorithms.getCipher();
             SshHmac hmac = algorithms.getHmac();
@@ -116,6 +118,10 @@ class TransportProtocolOutputStream {
             if (compression != null) {
                 msgdata = compression.compress(msgdata, 0, msgdata.length);
             }
+            
+            // Done with the algorithms. Release as early as possible.
+            algorithms.release();
+            locked = false;
 
             //Determine the padding length
             padding += ((cipherlen -
@@ -180,7 +186,9 @@ class TransportProtocolOutputStream {
                     ioe.getMessage());
             }
         } finally {
-            algorithms.release();
+        	if (locked) {
+        		algorithms.release();
+        	}
         }
     }
 }

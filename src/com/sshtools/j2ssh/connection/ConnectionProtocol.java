@@ -241,7 +241,7 @@ public class ConnectionProtocol extends AsyncService {
             int sent = 0;
             int block;
             int remaining;
-            long max;
+            int emptyBlockAttempts = 0;
             byte[] buffer = null;
             ChannelDataWindow window = channel.getRemoteWindow();
 
@@ -261,6 +261,10 @@ public class ConnectionProtocol extends AsyncService {
 	                //   the remote packet size
 	                block = (int)Math.min(remaining, Math.min(windowSpace, channel.getRemotePacketSize()));
 	                if (block < 1) {
+	                	emptyBlockAttempts++;
+	                	if (emptyBlockAttempts > 1000) {
+	                		throw new IOException("No window to send data to. windowSpace="+windowSpace+", remotePacketSize="+channel.getRemotePacketSize());
+	                	}
 	                	continue;
 	                }
 	                

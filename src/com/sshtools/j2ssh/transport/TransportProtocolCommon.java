@@ -30,6 +30,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InterruptedIOException;
 import java.math.BigInteger;
+import java.net.InetAddress;
 import java.nio.ByteBuffer;
 import java.nio.channels.Channels;
 import java.security.NoSuchAlgorithmException;
@@ -64,7 +65,7 @@ import com.sshtools.j2ssh.util.Hash;
  * @version $Revision: 1.2 $
  */
 public abstract class TransportProtocolCommon
-implements TransportProtocol, Runnable 
+implements TransportProtocol, Runnable
 {
 	// Flag to keep on running
     //private boolean keepRunning = true;
@@ -84,8 +85,8 @@ implements TransportProtocol, Runnable
 
     /**  */
     public static String SOFTWARE_VERSION_COMMENTS = "Warwick J2SSH Fork/1.0";
-    
-    private int threadNo = nextThreadNo++;
+
+    private final int threadNo = nextThreadNo++;
 
     /**  */
     protected BigInteger k = null;
@@ -138,27 +139,29 @@ implements TransportProtocol, Runnable
 
     /**  */
     protected byte[] signature = null;
-    
+
+    private InetAddress remoteAddress;
+
     /**
      * There is a bug in key re-exchange that appears when there is a lot
      * of traffic during rekeying. Until the bug is fixed, it will instead
      * delay rekeying until the connection has been quiet for this many milliseconds.
-     * 
+     *
      * Shouldn't be too long otherwise client IGNORE messages and other occasional
      * traffic might stop rekeying from happening.
      */
     private static final int REKEY_QUIET_WAIT_TIME = 1000;
-    
-    private Vector<TransportProtocolEventHandler> eventHandlers = new Vector<TransportProtocolEventHandler>();
+
+    private final Vector<TransportProtocolEventHandler> eventHandlers = new Vector<TransportProtocolEventHandler>();
 
     // Storage of messages whilst in key exchange
-    private List<SshMessage> messageStack = new ArrayList<SshMessage>();
+    private final List<SshMessage> messageStack = new ArrayList<SshMessage>();
 
     // Message notification registry
-    private Map messageNotifications = new HashMap();
+    private final Map messageNotifications = new HashMap();
 
     // Key exchange lock for accessing the kex init messages
-    private Object kexLock = new Object();
+    private final Object kexLock = new Object();
 
     // The underlying transport provider
     private TransportProvider provider;
@@ -171,9 +174,9 @@ implements TransportProtocol, Runnable
     private long kexTransferLimitKB = 1073741824L/1024L;
     // private long kexTransferLimit = 1073741824L;
     private long startTime = System.currentTimeMillis();
-    
+
     private long lastMessage = startTime;
-    
+
     private long transferredKB   = 0;
     private long lastTriggeredKB = 0;
 
@@ -189,8 +192,8 @@ implements TransportProtocol, Runnable
     private int remoteEOL = EOL_CRLF;
 
     //private Map registeredMessages = new HashMap();
-    private Vector<SshMessageStore> messageStores = new Vector<SshMessageStore>();
-    
+    private final Vector<SshMessageStore> messageStores = new Vector<SshMessageStore>();
+
 	private long messagesReceived;
 
     /**
@@ -245,7 +248,7 @@ implements TransportProtocol, Runnable
      *
      * @param description
      */
-    public void disconnect(String description) {
+    public void disconnect(final String description) {
         if (log.isDebugEnabled()) {
             log.debug("Disconnect: " + description);
         }
@@ -256,7 +259,7 @@ implements TransportProtocol, Runnable
             stop();
             state.setValue(TransportProtocolState.DISCONNECTED);
             state.setDisconnectReason(description);
-        } catch (Exception e) {
+        } catch (final Exception e) {
             log.warn("Failed to send disconnect", e);
         }
     }
@@ -266,7 +269,7 @@ implements TransportProtocol, Runnable
      *
      * @param sendIgnore
      */
-    public void setSendIgnore(boolean sendIgnore) {
+    public void setSendIgnore(final boolean sendIgnore) {
         this.sendIgnore = sendIgnore;
     }
 
@@ -277,7 +280,7 @@ implements TransportProtocol, Runnable
      *
      * @throws TransportProtocolException
      */
-    public void setKexTimeout(long seconds) throws TransportProtocolException {
+    public void setKexTimeout(final long seconds) throws TransportProtocolException {
         if (seconds < 60) {
             throw new TransportProtocolException(
                 "Keys can only be re-exchanged every minute or more");
@@ -293,7 +296,7 @@ implements TransportProtocol, Runnable
      *
      * @throws TransportProtocolException
      */
-    public void setKexTransferLimit(long kilobytes)
+    public void setKexTransferLimit(final long kilobytes)
         throws TransportProtocolException {
         if (kilobytes < 10) {
             throw new TransportProtocolException(
@@ -325,7 +328,7 @@ implements TransportProtocol, Runnable
      *
      * @param eventHandler
      */
-    public void addEventHandler(TransportProtocolEventHandler eventHandler) {
+    public void addEventHandler(final TransportProtocolEventHandler eventHandler) {
         if (eventHandler != null) {
             eventHandlers.add(eventHandler);
         }
@@ -345,7 +348,7 @@ implements TransportProtocol, Runnable
      * @return
      */
     public byte[] getSessionIdentifier() {
-        return (byte[]) sessionIdentifier.clone();
+        return sessionIdentifier.clone();
     }
 
     /**
@@ -357,17 +360,17 @@ implements TransportProtocol, Runnable
         log.info("Registering transport protocol messages with inputstream");
         algorithmsOut = new TransportProtocolAlgorithmSync();
         algorithmsIn = new TransportProtocolAlgorithmSync();
-        
+
         // Create the input/output streams
         sshIn = new TransportProtocolInputStream(
         	this,
-            Channels.newInputStream(provider.getReadableByteChannel()), 
+            Channels.newInputStream(provider.getReadableByteChannel()),
             algorithmsIn);
         sshOut = new TransportProtocolOutputStream(
         	Channels.newOutputStream(provider.getWritableByteChannel()),
-            this, 
+            this,
             algorithmsOut);
-        
+
         // Register the transport layer messages that this class will handle
         messageStore.registerMessage(SshMsgDisconnect.SSH_MSG_DISCONNECT,
             SshMsgDisconnect.class);
@@ -382,32 +385,32 @@ implements TransportProtocol, Runnable
         messageStore.registerMessage(SshMsgNewKeys.SSH_MSG_NEWKEYS,
             SshMsgNewKeys.class);
         registerTransportMessages();
-        
-        List<String> supportedKexs = SshKeyExchangeFactory.getSupportedKeyExchanges();
-        for (String keyExchange : supportedKexs) {
-          SshKeyExchange kex = SshKeyExchangeFactory.newInstance(keyExchange);
+
+        final List<String> supportedKexs = SshKeyExchangeFactory.getSupportedKeyExchanges();
+        for (final String keyExchange : supportedKexs) {
+          final SshKeyExchange kex = SshKeyExchangeFactory.newInstance(keyExchange);
           kex.init(this);
           kexs.put(keyExchange, kex);
         }
-        
+
         // call abstract to initialise the local ident string
         setLocalIdent();
-        
+
         // negotiate the protocol version
         negotiateVersion();
         startBinaryPacketProtocol();
-      } catch (EOFException eof) {
+      } catch (final EOFException eof) {
     	log.info("EOFException thrown - closing connection.");
-      } catch (Throwable e) {
-        if (e instanceof IOException) {
-          state.setLastError((IOException) e);
-        }
+      } catch (final IOException e) {
+		state.setLastError(e);
+		log.warn("IOException/" + e.getClass().getSimpleName() + ": " + e.getMessage());
+      } catch (final Throwable e) {
         log.error("The Transport Protocol thread failed", e);
       } finally {
         thread = null;
         stop();
       }
-      
+
       log.debug("The Transport Protocol has been stopped");
     }
 
@@ -416,7 +419,7 @@ implements TransportProtocol, Runnable
      * the message will have been fully written to the output stream and
      * flushed.
      */
-    public synchronized void sendMessage(SshMessage msg, Object sender)
+    public synchronized void sendMessage(final SshMessage msg, final Object sender)
         throws IOException {
         // Send a message, if were in key exchange then add it to
         // the list unless of course it is a transport protocol or key
@@ -429,22 +432,22 @@ implements TransportProtocol, Runnable
         	}
         }
 
-        int currentState = state.getValue();
+        final int currentState = state.getValue();
 
         if (sender instanceof SshKeyExchange ||
                 sender instanceof TransportProtocolCommon ||
                 (currentState == TransportProtocolState.CONNECTED)) {
-        	
+
             sshOut.sendMessage(msg);
 
             if (currentState == TransportProtocolState.CONNECTED) {
                 if (sendIgnore) {
-                	SecureRandom rnd = ConfigurationLoader.getRND();
-                    byte[] length = new byte[1];
+                	final SecureRandom rnd = ConfigurationLoader.getRND();
+                    final byte[] length = new byte[1];
 					rnd.nextBytes(length);
-					byte[] rand = new byte[(length[0] & 0xFF) + 1];
+					final byte[] rand = new byte[(length[0] & 0xFF) + 1];
                     rnd.nextBytes(rand);
-                    SshMsgIgnore ignore = new SshMsgIgnore(new String(rand));
+                    final SshMsgIgnore ignore = new SshMsgIgnore(new String(rand));
                     if (log.isDebugEnabled()) {
                         log.debug("Sending " + ignore.getMessageName());
                     }
@@ -481,11 +484,16 @@ implements TransportProtocol, Runnable
      *
      * @throws IOException
      */
-    public void startTransportProtocol(TransportProvider provider,
-        SshConnectionProperties properties) throws IOException {
+    public void startTransportProtocol(final TransportProvider provider,
+        final SshConnectionProperties properties) throws IOException {
         // Save the connected socket for later use
         this.provider = provider;
         this.properties = properties;
+
+        if (provider.isUsingInetAddress()) {
+        	if (log.isDebugEnabled()) log.debug("Saving remote address from transport provider");
+        	this.remoteAddress = provider.getRemoteAddress();
+        }
 
         // Start the transport layer message loop
         log.info("Starting transport protocol");
@@ -511,7 +519,7 @@ implements TransportProtocol, Runnable
      *
      * @throws MessageNotRegisteredException
      */
-    public void unregisterMessage(Integer messageId, SshMessageStore store)
+    public void unregisterMessage(final Integer messageId, final SshMessageStore store)
         throws MessageNotRegisteredException {
         if (log.isDebugEnabled()) {
             log.debug("Unregistering message Id " + messageId.toString());
@@ -521,7 +529,7 @@ implements TransportProtocol, Runnable
             throw new MessageNotRegisteredException(messageId);
         }
 
-        SshMessageStore actual = (SshMessageStore) messageNotifications.get(messageId);
+        final SshMessageStore actual = (SshMessageStore) messageNotifications.get(messageId);
 
         if (!store.equals(actual)) {
             throw new MessageNotRegisteredException(messageId, store);
@@ -695,7 +703,7 @@ implements TransportProtocol, Runnable
             }
 
             // Get an instance of the key exchange algortihm
-            SshKeyExchange kex = (SshKeyExchange) kexs.get(kexAlgorithm);
+            final SshKeyExchange kex = kexs.get(kexAlgorithm);
 
             // Do the key exchange
             performKeyExchange(kex);
@@ -717,7 +725,7 @@ implements TransportProtocol, Runnable
             // Send new keys
             sendNewKeys();
             kex.reset();
-        } catch (AlgorithmNotAgreedException e) {
+        } catch (final AlgorithmNotAgreedException e) {
             sendDisconnect(SshMsgDisconnect.KEY_EXCHANGE_FAILED,
                 "No suitable key exchange algorithm was agreed");
             throw new KeyExchangeException(
@@ -761,13 +769,13 @@ implements TransportProtocol, Runnable
      * Send a disconnect message with a description, and then
      * stop everything.
      */
-    protected void sendDisconnect(int reason, String description) {
-        SshMsgDisconnect msg = new SshMsgDisconnect(reason, description, "");
+    protected void sendDisconnect(final int reason, final String description) {
+        final SshMsgDisconnect msg = new SshMsgDisconnect(reason, description, "");
 
         try {
             sendMessage(msg, this);
             stop();
-        } catch (Exception e) {
+        } catch (final Exception e) {
             log.warn("Failed to send disconnect", e);
         }
     }
@@ -779,8 +787,8 @@ implements TransportProtocol, Runnable
      * @param description
      * @param error
      */
-    protected void sendDisconnect(int reason, String description,
-        IOException error) {
+    protected void sendDisconnect(final int reason, final String description,
+        final IOException error) {
         state.setLastError(error);
         sendDisconnect(reason, description);
     }
@@ -806,37 +814,15 @@ implements TransportProtocol, Runnable
         SshMsgNewKeys msg = new SshMsgNewKeys();
         sendMessage(msg, this);
 
-        // Lock the outgoing algorithms so nothing else is sent untill
-        // weve updated them with the new keys
-        algorithmsOut.lock();
-        algorithmsIn.lock();
+        final int[] filter = new int[1];
+        filter[0] = SshMsgNewKeys.SSH_MSG_NEWKEYS;
+        msg = (SshMsgNewKeys) readMessage(filter);
 
-        // Do we need to hold the algorithmsOut lock during
-        // the input message handling below? If not, then the 
-        // lock could be taken just before completeKeyExchange 
-        // or even moved into the completeKeyExchange method.
-        // We would then not need the try-finally below (which
-        // is needed for exceptions from eg the readMessage call).
-        boolean hasReleasedLock = false;
-        try {
-            int[] filter = new int[1];
-            filter[0] = SshMsgNewKeys.SSH_MSG_NEWKEYS;
-            msg = (SshMsgNewKeys) readMessage(filter);
-            
-            if (log.isDebugEnabled()) {
-                log.debug("Received " + msg.getMessageName());
-            }
-            
-            // Release done in completeKeyExchange
-            hasReleasedLock = true;
-            completeKeyExchange();
+        if (log.isDebugEnabled()) {
+            log.debug("Received " + msg.getMessageName());
         }
-        finally {
-            if( ! hasReleasedLock ) {
-            	algorithmsIn.lock();
-                algorithmsOut.release();
-            }
-        }
+
+        completeKeyExchange();
     }
 
     /**
@@ -857,7 +843,7 @@ implements TransportProtocol, Runnable
     protected abstract void setupNewKeys(byte[] encryptCSKey,
         byte[] encryptCSIV, byte[] encryptSCKey, byte[] encryptSCIV,
         byte[] macCSKey, byte[] macSCKey)
-        throws AlgorithmNotAgreedException, AlgorithmOperationException, 
+        throws AlgorithmNotAgreedException, AlgorithmOperationException,
             AlgorithmNotSupportedException, AlgorithmInitializationException;
 
     /**
@@ -871,17 +857,20 @@ implements TransportProtocol, Runnable
 
         boolean hasReleasedLock = false;
         try {
-            // Reset the state variables
+        	algorithmsOut.lock();
+        	algorithmsIn.lock();
+        	
+        	// Reset the state variables
             //completeOnNewKeys = new Boolean(false);
             log.debug("Making keys from key exchange output");
 
             // Make the keys
-            byte[] encryptionKey = makeSshKey('C');
-            byte[] encryptionIV = makeSshKey('A');
-            byte[] decryptionKey = makeSshKey('D');
-            byte[] decryptionIV = makeSshKey('B');
-            byte[] sendMac = makeSshKey('E');
-            byte[] receiveMac = makeSshKey('F');
+            final byte[] encryptionKey = makeSshKey('C');
+            final byte[] encryptionIV = makeSshKey('A');
+            final byte[] decryptionKey = makeSshKey('D');
+            final byte[] decryptionIV = makeSshKey('B');
+            final byte[] sendMac = makeSshKey('E');
+            final byte[] receiveMac = makeSshKey('F');
             log.debug("Creating algorithm objects");
             setupNewKeys(encryptionKey, encryptionIV, decryptionKey,
                 decryptionIV, sendMac, receiveMac);
@@ -902,33 +891,33 @@ implements TransportProtocol, Runnable
 
             // Send any outstanding messages
             synchronized (messageStack) {
-                Iterator it = messageStack.iterator();
+                final Iterator it = messageStack.iterator();
                 log.debug("Sending queued messages");
 
                 while (it.hasNext()) {
-                    SshMessage msg = (SshMessage) it.next();
+                    final SshMessage msg = (SshMessage) it.next();
                     sendMessage(msg, this);
                 }
 
                 messageStack.clear();
             }
-        } catch (AlgorithmNotAgreedException anae) {
+        } catch (final AlgorithmNotAgreedException anae) {
             sendDisconnect(SshMsgDisconnect.KEY_EXCHANGE_FAILED,
                 "Algorithm not agreed");
             throw new TransportProtocolException(
                 "The connection was disconnected because an algorithm could not be agreed");
-        } catch (AlgorithmNotSupportedException anse) {
+        } catch (final AlgorithmNotSupportedException anse) {
             sendDisconnect(SshMsgDisconnect.KEY_EXCHANGE_FAILED,
                 "Application error");
             throw new TransportProtocolException(
                 "The connection was disconnected because an algorithm class could not be loaded");
-        } catch (AlgorithmOperationException aoe) {
+        } catch (final AlgorithmOperationException aoe) {
             sendDisconnect(SshMsgDisconnect.KEY_EXCHANGE_FAILED,
                 "Algorithm operation error");
             throw new TransportProtocolException(
                 "The connection was disconnected because" +
                 " of an algorithm operation error");
-        } catch (AlgorithmInitializationException aie) {
+        } catch (final AlgorithmInitializationException aie) {
             sendDisconnect(SshMsgDisconnect.KEY_EXCHANGE_FAILED,
                 "Algorithm initialization error");
             throw new TransportProtocolException(
@@ -962,8 +951,8 @@ implements TransportProtocol, Runnable
      *
      * @throws AlgorithmNotAgreedException
      */
-    protected String determineAlgorithm(List clientAlgorithms,
-        List serverAlgorithms) throws AlgorithmNotAgreedException {
+    protected String determineAlgorithm(final List clientAlgorithms,
+        final List serverAlgorithms) throws AlgorithmNotAgreedException {
         if (log.isDebugEnabled()) {
             log.debug("Determine Algorithm");
             log.debug("Client Algorithms: " + clientAlgorithms.toString());
@@ -972,12 +961,12 @@ implements TransportProtocol, Runnable
 
         String algorithmClient;
         String algorithmServer;
-        Iterator itClient = clientAlgorithms.iterator();
+        final Iterator itClient = clientAlgorithms.iterator();
 
         while (itClient.hasNext()) {
             algorithmClient = (String) itClient.next();
 
-            Iterator itServer = serverAlgorithms.iterator();
+            final Iterator itServer = serverAlgorithms.iterator();
 
             while (itServer.hasNext()) {
                 algorithmServer = (String) itServer.next();
@@ -1001,7 +990,7 @@ implements TransportProtocol, Runnable
         sendKeyExchangeInit();
 
         SshMessage msg;
-        
+
         log.debug("Rekey time limit is " + kexTimeout + "ms");
 
         // Perform a transport protocol message loop
@@ -1051,6 +1040,8 @@ implements TransportProtocol, Runnable
         }
     }
 
+    protected abstract void onStop();
+
     /**
      * Stop all activity on this transport - catch and log errors where
      * possible - it's better to carry on and try to close everything
@@ -1061,62 +1052,63 @@ implements TransportProtocol, Runnable
     		log.info("Skipping stop() as we are already disconnected");
     		return;
     	}
-    	
+
     	log.info("Disconnecting");
-    	
+
     	try {
     		try {
     			onDisconnect();
     		} finally {
-		        for (TransportProtocolEventHandler eventHandler : eventHandlers) {
+		        for (final TransportProtocolEventHandler eventHandler : eventHandlers) {
 		            eventHandler.onDisconnect(this);
 		        }
     		}
-	
+
 	        // Close the input/output streams
 	        //sshIn.close();
 	        if (messageStore != null) {
 	        	try {
 	        		messageStore.close();
-				} catch (Exception e) {
+				} catch (final Exception e) {
 					log.warn(e);
 				}
 	        }
-	
+
 	        // 05/01/2003 moiz change begin:
 	        // all close all the registerd messageStores
-	        for (SshMessageStore ms : messageStores){
+	        for (final SshMessageStore ms : messageStores){
 	            try {
 	                ms.close();
-	            } catch (Exception e) {
+	            } catch (final Exception e) {
 	            	log.warn(e);
 	            }
 	        }
 	        messageStores.clear();
 	        // 05/01/2003 moizd change end:
 	        messageStore = null;
-	
+
 	        try {
 	        	log.info("Closing transport provider");
 	            provider.close();
-	        } catch (IOException ioe) {
+	        } catch (final IOException ioe) {
 	        	log.warn(ioe);
 	        }
-    	} catch (Exception e) {
+    	} catch (final Exception e) {
     		//Log the exception, but carry on execution because it's more
     		//important we finish cleaning up and close the connection.
     		log.error("Error during stop()", e);
     	} finally {
         	state.setValue(TransportProtocolState.DISCONNECTED);
+        	onStop();
         }
     }
 
-    private byte[] makeSshKey(char chr) throws IOException {
+    private byte[] makeSshKey(final char chr) throws IOException {
         try {
             // Create the first 20 bytes of key data
-            ByteArrayWriter keydata = new ByteArrayWriter();
+            final ByteArrayWriter keydata = new ByteArrayWriter();
             byte[] data = new byte[20];
-            Hash hash = new Hash("SHA");
+            final Hash hash = new Hash("SHA");
 
             // Put the dh k value
             hash.putBigInteger(k);
@@ -1152,11 +1144,11 @@ implements TransportProtocol, Runnable
 
             // Return it
             return keydata.toByteArray();
-        } catch (NoSuchAlgorithmException nsae) {
+        } catch (final NoSuchAlgorithmException nsae) {
             sendDisconnect(SshMsgDisconnect.KEY_EXCHANGE_FAILED,
                 "Application error");
             throw new TransportProtocolException("SHA algorithm not supported");
-        } catch (IOException ioe) {
+        } catch (final IOException ioe) {
             sendDisconnect(SshMsgDisconnect.KEY_EXCHANGE_FAILED,
                 "Application error");
             throw new TransportProtocolException("Error writing key data");
@@ -1164,8 +1156,8 @@ implements TransportProtocol, Runnable
     }
 
     private void negotiateVersion() throws IOException {
-        byte[] buf;
-        int len;
+        final byte[] buf;
+        final int len;
         String remoteVer = "";
         log.info("Negotiating protocol version");
         log.debug("Local identification: " + getLocalId());
@@ -1173,24 +1165,24 @@ implements TransportProtocol, Runnable
         // Get the local ident string by calling the abstract method, this
         // way the implementations set the correct variables for computing the
         // exchange hash
-        String data = getLocalId() + "\r\n";
+        final String data = getLocalId() + "\r\n";
 
         // Send our version string
         provider.getWritableByteChannel().write(ByteBuffer.wrap(data.getBytes()));
 
         // Now wait for a reply and evaluate the ident string
         //buf = new byte[255];
-        StringBuffer buffer = new StringBuffer();
+        final StringBuffer buffer = new StringBuffer();
         char ch;
-        int MAX_BUFFER_LENGTH = 255;
+        final int MAX_BUFFER_LENGTH = 255;
 
         // Look for a string starting with "SSH-"
         while (!remoteVer.startsWith("SSH-") &&
                 (buffer.length() < MAX_BUFFER_LENGTH)) {
             // Get the next string
-        	
-        	InputStream is = Channels.newInputStream(provider.getReadableByteChannel());
-        	
+
+        	final InputStream is = Channels.newInputStream(provider.getReadableByteChannel());
+
             while (((ch = (char) is.read()) != '\n') &&
                     (buffer.length() < MAX_BUFFER_LENGTH)) {
                 buffer.append(ch);
@@ -1214,8 +1206,8 @@ implements TransportProtocol, Runnable
         }
 
         // Get the index of the seperators
-        int l = remoteVer.indexOf("-");
-        int r = remoteVer.indexOf("-", l + 1);
+        final int l = remoteVer.indexOf("-");
+        final int r = remoteVer.indexOf("-", l + 1);
 
         // This can happen if a server just opens a connection and sends some nonsense
         // at random. Stop them here rather than throw a confusing exception.
@@ -1223,7 +1215,7 @@ implements TransportProtocol, Runnable
         	log.error("Remote machine sent unrecognised version string. Disconnecting.");
         	throw new TransportProtocolException("Unrecognised version string sent by remote server");
         }
-        
+
         // Call abstract method so the implementations can set the
         // correct member variable
         setRemoteIdent(remoteVer.trim());
@@ -1233,7 +1225,7 @@ implements TransportProtocol, Runnable
         }
 
         // Get the version
-        String remoteVersion = remoteVer.substring(l + 1, r);
+        final String remoteVersion = remoteVer.substring(l + 1, r);
 
         // Evaluate the version, we only support 2.0
         if (!(remoteVersion.equals("2.0") || (remoteVersion.equals("1.99")))) {
@@ -1246,30 +1238,30 @@ implements TransportProtocol, Runnable
         log.info("Protocol negotiation complete");
     }
 
-    private void onMsgDebug(SshMsgDebug msg) {
+    private void onMsgDebug(final SshMsgDebug msg) {
         log.debug(msg.getMessage());
     }
 
-    private void onMsgDisconnect(SshMsgDisconnect msg)
+    private void onMsgDisconnect(final SshMsgDisconnect msg)
         throws IOException {
         log.info("The remote computer disconnected: " + msg.getDescription());
         stop();
         state.setDisconnectReason(msg.getDescription());
     }
 
-    private void onMsgIgnore(SshMsgIgnore msg) {
+    private void onMsgIgnore(final SshMsgIgnore msg) {
         if (log.isDebugEnabled()) {
             log.debug("SSH_MSG_IGNORE with " +
                 String.valueOf(msg.getData().length()) + " bytes of data");
         }
     }
 
-    /** 
+    /**
      * A request from the remote machine to exchange fresh keys.
-     * 
+     *
      * See processMessages for locally initiated key exchange.
      */
-    private void onMsgKexInit(SshMsgKexInit msg) throws IOException {
+    private void onMsgKexInit(final SshMsgKexInit msg) throws IOException {
         log.debug("Received remote key exchange init message");
         log.debug(msg.toString());
 
@@ -1288,17 +1280,12 @@ implements TransportProtocol, Runnable
         }
     }
 
-    private void onMsgNewKeys(SshMsgNewKeys msg) throws IOException {
+    private void onMsgNewKeys(final SshMsgNewKeys msg) throws IOException {
         // Determine whether we have completed our own
         log.debug("Received New Keys");
-        //algorithmsIn.lock();
 
         synchronized (completeOnNewKeys) {
             if (completeOnNewKeys.booleanValue()) {
-                // We need to take this lock since
-                // it is released in completeKeyExchange.
-                algorithmsOut.lock();
-                algorithmsIn.lock();
                 completeKeyExchange();
             } else {
                 completeOnNewKeys = new Boolean(true);
@@ -1306,7 +1293,7 @@ implements TransportProtocol, Runnable
         }
     }
 
-    private void onMsgUnimplemented(SshMsgUnimplemented msg) {
+    private void onMsgUnimplemented(final SshMsgUnimplemented msg) {
         if (log.isDebugEnabled()) {
             log.debug("The message with sequence no " + msg.getSequenceNo() +
                 " was reported as unimplemented by the remote end.");
@@ -1322,27 +1309,27 @@ implements TransportProtocol, Runnable
      *
      * @throws IOException
      */
-    public SshMessage readMessage(int[] filter) throws IOException {
+    public SshMessage readMessage(final int[] filter) throws IOException {
         byte[] msgdata = null;
         SshMessage msg;
 
         while (state.getValue() != TransportProtocolState.DISCONNECTED) {
-            
+
             msgdata = sshIn.readMessage();
 
-            Integer messageId = SshMessage.getMessageId(msgdata);
+            final Integer messageId = SshMessage.getMessageId(msgdata);
 
             // First check the filter
-            for (int id : filter) {
+            for (final int id : filter) {
                 if (id == messageId.intValue()) {
                     if (messageStore.isRegisteredMessage(messageId)) {
-                        SshMessage message = messageStore.createMessage(msgdata);
+                        final SshMessage message = messageStore.createMessage(msgdata);
                         if (log.isDebugEnabled()) {
                             log.debug("Received for transport - " + message.getMessageName());
                         }
 						return message;
                     } else {
-                        SshMessageStore ms = getMessageStore(messageId);
+                        final SshMessageStore ms = getMessageStore(messageId);
                         msg = ms.createMessage(msgdata);
                         if (log.isDebugEnabled()) {
                             log.debug("Received " + msg.getMessageName());
@@ -1401,13 +1388,13 @@ implements TransportProtocol, Runnable
         SshMessageStore ms;
 
         while (state.getValue() != TransportProtocolState.DISCONNECTED) {
-            long currentTime = System.currentTimeMillis();
+            final long currentTime = System.currentTimeMillis();
 
             transferredKB =  sshIn.getNumBytesTransfered()/1024
                           + sshOut.getNumBytesTransfered()/1024;
-           
-            long kbLimit = transferredKB - lastTriggeredKB; 
-            
+
+            final long kbLimit = transferredKB - lastTriggeredKB;
+
             if (((currentTime - startTime) > kexTimeout) ||
                 (kbLimit > kexTransferLimitKB)) {
               if (currentTime > lastMessage + REKEY_QUIET_WAIT_TIME) {
@@ -1415,7 +1402,7 @@ implements TransportProtocol, Runnable
 	              lastTriggeredKB = transferredKB;
 	              if (log.isDebugEnabled()) {
 	                log.debug("rekey");
-	              }              
+	              }
 	              sendKeyExchangeInit();
               } else {
             	  if (log.isDebugEnabled()) {
@@ -1423,27 +1410,27 @@ implements TransportProtocol, Runnable
   	              }
               }
             }
-            
+
             boolean hasmsg = false;
 
             while (!hasmsg) {
                 try {
                     msgdata = sshIn.readMessage();
                     hasmsg = true;
-                } catch (InterruptedIOException ex /*SocketTimeoutException ex*/) {
+                } catch (final InterruptedIOException ex /*SocketTimeoutException ex*/) {
                     log.info("Possible timeout on transport inputstream");
-                    for (TransportProtocolEventHandler eventHandler : eventHandlers) {
+                    for (final TransportProtocolEventHandler eventHandler : eventHandlers) {
                         eventHandler.onSocketTimeout(this);
                     }
                 }
             }
-            
+
             this.lastMessage = currentTime;
 
-            Integer messageId = SshMessage.getMessageId(msgdata);
+            final Integer messageId = SshMessage.getMessageId(msgdata);
 
             messagesReceived++;
-            
+
             if (!messageStore.isRegisteredMessage(messageId)) {
                 try {
                     ms = getMessageStore(messageId);
@@ -1458,7 +1445,7 @@ implements TransportProtocol, Runnable
                     }
 
                     ms.addMessage(msg);
-                } catch (MessageNotRegisteredException mnre) {
+                } catch (final MessageNotRegisteredException mnre) {
                     log.info("Unimplemented message received " +
                         String.valueOf(messageId.intValue()));
                     msg = new SshMsgUnimplemented(sshIn.getSequenceNo());
@@ -1479,13 +1466,13 @@ implements TransportProtocol, Runnable
      *
      * @throws MessageAlreadyRegisteredException
      */
-    public void addMessageStore(SshMessageStore store)
+    public void addMessageStore(final SshMessageStore store)
         throws MessageAlreadyRegisteredException {
         messageStores.add(store);
     }
 
-    private SshMessageStore getMessageStore(Integer messageId) throws MessageNotRegisteredException {
-        for (SshMessageStore ms : messageStores) {
+    private SshMessageStore getMessageStore(final Integer messageId) throws MessageNotRegisteredException {
+        for (final SshMessageStore ms : messageStores) {
             if (ms.isRegisteredMessage(messageId)) {
                 return ms;
             }
@@ -1493,7 +1480,7 @@ implements TransportProtocol, Runnable
         throw new MessageNotRegisteredException(messageId);
     }
 
-    public void removeMessageStore(SshMessageStore ms) {
+    public void removeMessageStore(final SshMessageStore ms) {
         messageStores.remove(ms);
     }
 
@@ -1503,5 +1490,14 @@ implements TransportProtocol, Runnable
 
 	public long getMessagesReceived() {
 		return messagesReceived;
+	}
+
+	/**
+	 * Gets the remote address. This is only set if the connection has been
+	 * started and is using the correct socket channel based transport
+	 * provider. Otherwise it will be null.
+	 */
+	public InetAddress getRemoteAddress() {
+		return remoteAddress;
 	}
 }

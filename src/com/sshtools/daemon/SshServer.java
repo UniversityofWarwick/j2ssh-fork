@@ -32,10 +32,14 @@ import java.net.ServerSocket;
 import java.net.Socket;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
+import java.util.ArrayList;
+import java.util.Calendar;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Timer;
+import java.util.TimerTask;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -46,6 +50,7 @@ import com.sshtools.daemon.configuration.ServerConfiguration;
 import com.sshtools.daemon.transport.TransportProtocolServer;
 import com.sshtools.j2ssh.SshException;
 import com.sshtools.j2ssh.SshThread;
+import com.sshtools.j2ssh.authentication.AuthenticationProtocolListener;
 import com.sshtools.j2ssh.configuration.ConfigurationLoader;
 import com.sshtools.j2ssh.configuration.SshConnectionProperties;
 import com.sshtools.j2ssh.connection.ConnectionProtocol;
@@ -64,25 +69,24 @@ import com.sshtools.j2ssh.util.StartStopState;
  */
 public abstract class SshServer {
     private static Log log = LogFactory.getLog(SshServer.class);
+
+    private static final int TERMINATOR_CHECK_PERIOD = 30 * 1000; // 30 seconds
+
     private ConnectionListener listener = null;
     //private ServerSocket server = null;
     private boolean shutdown = false;
     private ServerSocket commandServerSocket;
-    
+
     private boolean acceptingConnections = true;
 
-	/**  */
     protected List<TransportProtocolServer> activeConnections = new LinkedList<TransportProtocolServer>();
     Thread thread;
 
-    /**
- * Creates a new SshServer object.
- *
- * @throws IOException
- * @throws SshException
- */
+    private final Timer terminatorTimer = new Timer(true);
+
+
     public SshServer() throws IOException {
-        String serverId = System.getProperty("sshtools.serverid");
+        final String serverId = System.getProperty("sshtools.serverid");
 
         if (serverId != null) {
             TransportProtocolServer.SOFTWARE_VERSION_COMMENTS = serverId;
@@ -98,13 +102,14 @@ public abstract class SshServer {
             throw new SshException("Platform configuration not available");
         }
 
-        if (((ServerConfiguration) ConfigurationLoader.getConfiguration(
+        if ((ConfigurationLoader.getConfiguration(
                     ServerConfiguration.class)).getServerHostKeys().size() <= 0) {
             throw new SshException(
                 "Server cannot start because there are no server host keys available");
         }
+
     }
-    
+
 
     public boolean isAcceptingConnections() {
 		return acceptingConnections;
@@ -115,7 +120,7 @@ public abstract class SshServer {
      * This may be useful when you want to shut down the server gracefully
      * by waiting for existing connections to end, without allowing new ones.
      */
-	public void setAcceptingConnections(boolean acceptingConnections) {
+	public void setAcceptingConnections(final boolean acceptingConnections) {
 		this.acceptingConnections = acceptingConnections;
 		log.info("Accepting connections changed to: " + acceptingConnections);
 	}
@@ -125,18 +130,18 @@ public abstract class SshServer {
         log.info("Starting server");
         shutdown = false;
         startServerSocket();
-        
-        
+
+
         thread = new Thread(new Runnable() {
                     public void run() {
                         try {
                             startCommandSocket();
-                        } catch (IOException ex) {
+                        } catch (final IOException ex) {
                             log.info("Failed to start command socket", ex);
 
                             try {
                                 stopServer("The command socket failed to start");
-                            } catch (IOException ex1) {
+                            } catch (final IOException ex1) {
                             }
                         }
                     }
@@ -145,24 +150,24 @@ public abstract class SshServer {
 
         try {
             thread.join();
-        } catch (InterruptedException e) {
+        } catch (final InterruptedException e) {
             e.printStackTrace();
         }
     }
 
     /**
- *
- *
- * @param command
- * @param client
- *
- * @throws IOException
- */
-    protected void processCommand(int command, Socket client)
+	 *
+	 *
+	 * @param command
+	 * @param client
+	 *
+	 * @throws IOException
+	 */
+    protected void processCommand(final int command, final Socket client)
         throws IOException {
         if (command == 0x3a) {
-            int len = client.getInputStream().read();
-            byte[] msg = new byte[len];
+            final int len = client.getInputStream().read();
+            final byte[] msg = new byte[len];
             client.getInputStream().read(msg);
             stopServer(new String(msg, "UTF8"));
         }
@@ -173,7 +178,7 @@ public abstract class SshServer {
 	 */
     protected void startCommandSocket() throws IOException {
         try {
-        	int commandPort = ConfigurationLoader.getConfiguration(ServerConfiguration.class).getCommandPort();
+        	final int commandPort = ConfigurationLoader.getConfiguration(ServerConfiguration.class).getCommandPort();
             commandServerSocket = new ServerSocket(commandPort, 50, InetAddress.getLocalHost());
 
             Socket client;
@@ -191,7 +196,7 @@ public abstract class SshServer {
             }
 
             commandServerSocket.close();
-        } catch (Exception e) {
+        } catch (final Exception e) {
             if (!shutdown) {
                 log.fatal("The command socket failed", e);
             }
@@ -203,22 +208,24 @@ public abstract class SshServer {
 	 *	messages.
 	 */
     protected void startServerSocket() throws IOException {
-        ServerConfiguration serverConfiguration = (ServerConfiguration) ConfigurationLoader.getConfiguration(
+        final ServerConfiguration serverConfiguration = ConfigurationLoader.getConfiguration(
 		    ServerConfiguration.class);
-		InetAddress address = InetAddress.getByName(serverConfiguration.getListenAddress());
-		int port = serverConfiguration.getPort();
+		final InetAddress address = InetAddress.getByName(serverConfiguration.getListenAddress());
+		final int port = serverConfiguration.getPort();
 		listener = new ConnectionListener(address, port);
         listener.start();
+
+        terminatorTimer.scheduleAtFixedRate(new Terminator(), TERMINATOR_CHECK_PERIOD, TERMINATOR_CHECK_PERIOD);
     }
 
     /**
- *
- *
- * @param msg
- *
- * @throws IOException
- */
-    public void stopServer(String msg) throws IOException {
+	 *
+	 *
+	 * @param msg
+	 *
+	 * @throws IOException
+	 */
+    public void stopServer(final String msg) throws IOException {
         log.info("Shutting down server");
         shutdown = true;
         log.debug(msg);
@@ -230,60 +237,108 @@ public abstract class SshServer {
             if (commandServerSocket != null) {
                 commandServerSocket.close();
             }
-        } catch (IOException ioe) {
+        } catch (final IOException ioe) {
             log.error(ioe);
         }
     }
 
- 
+
     protected abstract void shutdown(String msg);
 
     protected abstract void configureServices(ConnectionProtocol connection)
         throws IOException;
 
- 
-    protected void refuseSession(SocketChannel socketChannel) throws IOException {
+    /**
+     * Allows a subclass to selectively reject connections based on a socket.
+     * If you don't wish to implement anything for this, you should simply
+     * return true.
+     */
+    protected abstract boolean isAcceptConnectionFrom(Socket socket);
+
+    protected void onAuthenticationComplete(final Socket socket) {}
+    protected void onAuthenticationFailed(final Socket socket) {}
+
+    protected void refuseSession(final SocketChannel socketChannel) throws IOException {
     	if (log.isDebugEnabled()) log.debug("Refuse session");
-        TransportProtocolServer transport = new TransportProtocolServer(true);
+        final TransportProtocolServer transport = new TransportProtocolServer(true);
         transport.startTransportProtocol(new ConnectedSocketChannelTransportProvider(socketChannel), new SshConnectionProperties());
     }
 
-    protected TransportProtocolServer createSession(SocketChannel socketChannel)
+    protected TransportProtocolServer createSession(final SocketChannel socketChannel)
         throws IOException {
     	if (log.isDebugEnabled()) log.debug("Initializing connection");
-        InetAddress address = socketChannel.socket().getInetAddress();
-        if (log.isDebugEnabled()) log.debug("Remote Address: " + address.toString());
+        final InetAddress address = socketChannel.socket().getInetAddress();
+        if (log.isDebugEnabled()) log.debug("Remote Address: " + address.getHostAddress());
 
-        TransportProtocolServer transport = new TransportProtocolServer();
-        AuthenticationProtocolServer authentication = new AuthenticationProtocolServer();
-        ConnectionProtocol connection = new ConnectionProtocol();
+        final AuthenticationProtocolServer authentication = new AuthenticationProtocolServer();
+        final ConnectionProtocol connection = new ConnectionProtocol();
 
-        ConnectedSocketChannelTransportProvider transportProvider 
+        final ConnectedSocketChannelTransportProvider transportProvider
 				= new ConnectedSocketChannelTransportProvider(socketChannel);
-        
+
         // Configure the connections services
         configureServices(connection);
+
+        // Bind authentication listeners that will call to some implementable
+        // methods with the socket as argument. This is to make it possible to implement
+        // things like per-IP login failure limits.
+        authentication.addListener(new AuthenticationProtocolListener() {
+			@Override
+			public void onAuthenticationComplete() {
+				SshServer.this.onAuthenticationComplete(socketChannel.socket());
+			}
+			@Override
+			public void onAuthenticationFailed() {
+				SshServer.this.onAuthenticationFailed(socketChannel.socket());
+			}
+        });
 
         // Allow the Connection Protocol to be accepted by the Authentication Protocol
         authentication.acceptService(connection);
 
         // Allow the Authentication Protocol to be accepted by the Transport Protocol
+        final TransportProtocolServer transport = new TransportProtocolServer(authentication, connection);
         transport.acceptService(authentication);
 		transport.startTransportProtocol(transportProvider, new SshConnectionProperties());
 
         return transport;
     }
 
+    /**
+     * Scans the list of connections, looking for ones above a certain age that
+     * have no channels, and issuing a disconnect message for them.
+     */
+    class Terminator extends TimerTask {
+    	//youngest age at which the Terminator will disconnect a connection.
+		private static final int MINIMUM_TERMINATION_AGE_MINUTES = 10;
+
+		@Override
+		public void run() {
+			final Calendar youngest = Calendar.getInstance();
+			youngest.add(Calendar.MINUTE, -MINIMUM_TERMINATION_AGE_MINUTES);
+			synchronized (activeConnections) {
+				//Make a copy of the list so that we don't get concurrent modification exceptions.
+				for (final TransportProtocolServer connection : new ArrayList<TransportProtocolServer>(activeConnections)) {
+					final ConnectionProtocol protocol = connection.getConnectionProtocol();
+					if (protocol != null && protocol.getChannelCount() == 0 && connection.getCreatedDate().before(youngest.getTime())) {
+						log.info("Stopping connection " + connection.getConnectionId() + " as it has no sessions");
+						connection.disconnect("Inactive connection");
+					}
+				}
+			}
+		}
+    }
+
     class ConnectionListener implements Runnable {
-        private Log log = LogFactory.getLog(ConnectionListener.class);
+        private final Log log = LogFactory.getLog(ConnectionListener.class);
         private ServerSocketChannel server;
-        private InetAddress listenAddress;
+        private final InetAddress listenAddress;
         private Thread thread;
         private int maxConnections;
-        private int port;
-        private StartStopState state = new StartStopState(StartStopState.STOPPED);
+        private final int port;
+        private final StartStopState state = new StartStopState(StartStopState.STOPPED);
 
-        public ConnectionListener(InetAddress listenAddress, int port) {
+        public ConnectionListener(final InetAddress listenAddress, final int port) {
             this.port = port;
             this.listenAddress = listenAddress;
         }
@@ -292,10 +347,7 @@ public abstract class SshServer {
             try {
                 log.debug("Starting connection listener thread on address " + listenAddress);
                 state.setValue(StartStopState.STARTED);
-                
-                //server = new ServerSocket(port, 0, listenAddress);
-                //Socket socket;
-                
+
                 server = ServerSocketChannel.open();
                 server.socket().bind(new InetSocketAddress(listenAddress, port), 0);
                 log.debug("ServerSocketChannel opened. blocking: " + server.isBlocking());
@@ -303,8 +355,9 @@ public abstract class SshServer {
                 SocketChannel socketChannel;
                 maxConnections = ConfigurationLoader.getConfiguration(ServerConfiguration.class).getMaxConnections();
 
-                TransportProtocolEventHandler eventHandler = new TransportProtocolEventAdapter() {
-                    public void onDisconnect(TransportProtocol transport) {
+                final TransportProtocolEventHandler eventHandler = new TransportProtocolEventAdapter() {
+                    @Override
+					public void onDisconnect(final TransportProtocol transport) {
                         // Remove from our active channels list only if
                         // we're still connected (the thread cleans up
                         // when were exiting so this is to avoid any concurrent
@@ -318,17 +371,19 @@ public abstract class SshServer {
                     }
                 };
 
+
+
                 try {
                     while (((socketChannel = server.accept()) != null) &&
                             (state.getValue() == StartStopState.STARTED)) {
                         log.debug("New connection requested");
-                        
-                        Socket socket = socketChannel.socket();
 
-                        if (!isAcceptingConnections() || maxConnections < activeConnections.size()) {
+                        final Socket socket = socketChannel.socket();
+
+                        if (!isAcceptingConnections() || !isAcceptConnectionFrom(socket) || maxConnections < activeConnections.size()) {
                             refuseSession(socketChannel);
                         } else {
-                            TransportProtocolServer transport = createSession(socketChannel);
+                            final TransportProtocolServer transport = createSession(socketChannel);
                             log.info("Monitoring active session from " +
                             		socket.getInetAddress().toString());
 
@@ -339,7 +394,7 @@ public abstract class SshServer {
                             transport.addEventHandler(eventHandler);
                         }
                     }
-                } catch (IOException ex) {
+                } catch (final IOException ex) {
                     if (state.getValue() != StartStopState.STOPPED) {
                         log.info("The server was shutdown unexpectedly", ex);
                     }
@@ -350,13 +405,13 @@ public abstract class SshServer {
                 // Closing all connections
                 log.info("Disconnecting active sessions");
 
-                for (TransportProtocolServer s : activeConnections) {
+                for (final TransportProtocolServer s : activeConnections) {
                     s.disconnect("The server is shutting down");
                 }
 
                 listener = null;
                 log.info("Exiting connection listener thread");
-            } catch (IOException ex) {
+            } catch (final IOException ex) {
                 log.info("The server thread failed", ex);
             } finally {
                 thread = null;
@@ -372,7 +427,7 @@ public abstract class SshServer {
         public void stop() {
             try {
                 state.setValue(StartStopState.STOPPED);
-                
+
                 if (server != null) {
                 	server.close();
                 } else {
@@ -382,7 +437,7 @@ public abstract class SshServer {
                 if (thread != null) {
                     thread.interrupt();
                 }
-            } catch (IOException ioe) {
+            } catch (final IOException ioe) {
                 log.warn("The listening socket reported an error during shutdown", ioe);
             }
         }

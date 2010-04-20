@@ -25,20 +25,20 @@
  */
 package com.sshtools.daemon;
 
-import com.sshtools.common.configuration.*;
+import java.io.IOException;
+import java.net.InetAddress;
+import java.net.Socket;
 
-import com.sshtools.daemon.configuration.*;
-import com.sshtools.daemon.forwarding.*;
-import com.sshtools.daemon.session.*;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 
-import com.sshtools.j2ssh.configuration.*;
-import com.sshtools.j2ssh.connection.*;
-
-import org.apache.commons.logging.*;
-
-import java.io.*;
-
-import java.net.*;
+import com.sshtools.common.configuration.XmlConfigurationContext;
+import com.sshtools.daemon.configuration.ServerConfiguration;
+import com.sshtools.daemon.configuration.XmlServerConfigurationContext;
+import com.sshtools.daemon.forwarding.ForwardingServer;
+import com.sshtools.daemon.session.SessionChannelFactory;
+import com.sshtools.j2ssh.configuration.ConfigurationLoader;
+import com.sshtools.j2ssh.connection.ConnectionProtocol;
 
 
 /**
@@ -118,6 +118,11 @@ public class SshDaemon {
                 public void shutdown(String msg) {
                     // Disconnect all sessions
                 }
+
+				@Override
+				protected boolean isAcceptConnectionFrom(Socket socket) {
+					return true;
+				}
             };
 
         server.startServer();

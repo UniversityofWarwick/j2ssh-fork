@@ -29,7 +29,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
@@ -42,6 +41,7 @@ import com.sshtools.daemon.util.StringUtil;
 import com.sshtools.j2ssh.SshException;
 import com.sshtools.j2ssh.SshThread;
 import com.sshtools.j2ssh.authentication.AuthenticationProtocolException;
+import com.sshtools.j2ssh.authentication.AuthenticationProtocolListener;
 import com.sshtools.j2ssh.authentication.AuthenticationProtocolState;
 import com.sshtools.j2ssh.authentication.SshMsgUserAuthBanner;
 import com.sshtools.j2ssh.authentication.SshMsgUserAuthFailure;
@@ -64,18 +64,20 @@ import com.sshtools.j2ssh.transport.TransportProtocolState;
  * @version $Revision: 1.11 $
  */
 public class AuthenticationProtocolServer extends AsyncService {
-	
+
     public static final String SERVICE_NAME = "ssh-userauth";
 	private static final Log log = LogFactory.getLog(AuthenticationProtocolServer.class);
-	
-    private List completedAuthentications = new ArrayList();
-    private Map acceptServices = new HashMap();
+
+    private final List completedAuthentications = new ArrayList();
+    private final Map acceptServices = new HashMap();
     private List<String> availableAuths;
     private String serviceToStart;
-    private int[] messageFilter = new int[1];
-    private SshMessageStore methodMessages = new SshMessageStore();
+    private final int[] messageFilter = new int[1];
+    private final SshMessageStore methodMessages = new SshMessageStore();
     private int attempts = 0;
     private boolean completed = false;
+
+    private final List<AuthenticationProtocolListener> listeners = new ArrayList<AuthenticationProtocolListener>();
 
     /**
  * Creates a new AuthenticationProtocolServer object.
@@ -85,12 +87,19 @@ public class AuthenticationProtocolServer extends AsyncService {
         messageFilter[0] = SshMsgUserAuthRequest.SSH_MSG_USERAUTH_REQUEST;
     }
 
+
+    public void addListener(final AuthenticationProtocolListener listener) {
+    	listeners.add(listener);
+    }
+
+
     /**
  *
  *
  * @throws java.io.IOException
  */
-    protected void onServiceAccept() throws java.io.IOException {
+    @Override
+	protected void onServiceAccept() throws java.io.IOException {
     }
 
     /**
@@ -100,7 +109,8 @@ public class AuthenticationProtocolServer extends AsyncService {
  *
  * @throws java.io.IOException
  */
-    protected void onServiceInit(int startMode) throws java.io.IOException {
+    @Override
+	protected void onServiceInit(final int startMode) throws java.io.IOException {
         // Register the required messages
         messageStore.registerMessage(SshMsgUserAuthRequest.SSH_MSG_USERAUTH_REQUEST,
             SshMsgUserAuthRequest.class);
@@ -132,7 +142,7 @@ public class AuthenticationProtocolServer extends AsyncService {
  *
  * @throws IOException
  */
-    public void sendMessage(SshMessage msg) throws IOException {
+    public void sendMessage(final SshMessage msg) throws IOException {
         transport.sendMessage(msg, this);
     }
 
@@ -147,7 +157,7 @@ public class AuthenticationProtocolServer extends AsyncService {
     public SshMessage readMessage() throws IOException {
         try {
             return methodMessages.nextMessage();
-        } catch (InterruptedException ex) {
+        } catch (final InterruptedException ex) {
             throw new SshException("The thread was interrupted");
         }
     }
@@ -158,7 +168,7 @@ public class AuthenticationProtocolServer extends AsyncService {
  * @param messageId
  * @param cls
  */
-    public void registerMessage(int messageId, Class cls) {
+    public void registerMessage(final int messageId, final Class cls) {
         methodMessages.registerMessage(messageId, cls);
     }
 
@@ -168,18 +178,19 @@ public class AuthenticationProtocolServer extends AsyncService {
  * @throws java.io.IOException
  * @throws AuthenticationProtocolException
  */
-    protected void onServiceRequest() throws java.io.IOException {
+    @Override
+	protected void onServiceRequest() throws java.io.IOException {
         // Send a user auth banner if configured
-        ServerConfiguration server = (ServerConfiguration) ConfigurationLoader.getConfiguration(ServerConfiguration.class);
+        final ServerConfiguration server = ConfigurationLoader.getConfiguration(ServerConfiguration.class);
 
         if (server == null) {
             throw new AuthenticationProtocolException(
                 "Server configuration unavailable");
         }
 
-        List<String> allowed = server.getAllowedAuthentications();
+        final List<String> allowed = server.getAllowedAuthentications();
         availableAuths = new ArrayList<String>();
-        for (String method : SshAuthenticationServerFactory.getSupportedMethods()) {
+        for (final String method : SshAuthenticationServerFactory.getSupportedMethods()) {
             if (allowed.contains(method)) {
                 availableAuths.add(method);
             }
@@ -193,18 +204,18 @@ public class AuthenticationProtocolServer extends AsyncService {
         // Accept the service request
         sendServiceAccept();
 
-        String bannerFile = server.getAuthenticationBanner();
+        final String bannerFile = server.getAuthenticationBanner();
 
         if (bannerFile != null) {
             if (bannerFile.length() > 0) {
-                InputStream in = ConfigurationLoader.loadFile(bannerFile);
+                final InputStream in = ConfigurationLoader.loadFile(bannerFile);
 
                 if (in != null) {
-                    byte[] data = new byte[in.available()];
+                    final byte[] data = new byte[in.available()];
                     in.read(data);
                     in.close();
 
-                    SshMsgUserAuthBanner bannerMsg = new SshMsgUserAuthBanner(new String(data, ByteArrayReader.UTF_8));
+                    final SshMsgUserAuthBanner bannerMsg = new SshMsgUserAuthBanner(new String(data, ByteArrayReader.UTF_8));
                     transport.sendMessage(bannerMsg, this);
                 } else {
                     log.info("The banner file '" + bannerFile +
@@ -222,7 +233,8 @@ public class AuthenticationProtocolServer extends AsyncService {
  * @throws java.io.IOException
  * @throws AuthenticationProtocolException
  */
-    protected void onMessageReceived(SshMessage msg) throws java.io.IOException {
+    @Override
+	protected void onMessageReceived(final SshMessage msg) throws java.io.IOException {
         switch (msg.getMessageId()) {
         case SshMsgUserAuthRequest.SSH_MSG_USERAUTH_REQUEST: {
             onMsgUserAuthRequest((SshMsgUserAuthRequest) msg);
@@ -241,54 +253,65 @@ public class AuthenticationProtocolServer extends AsyncService {
  *
  * @return
  */
-    protected int[] getAsyncMessageFilter() {
+    @Override
+	protected int[] getAsyncMessageFilter() {
         return messageFilter;
     }
 
     /**
- *
- *
- * @param service
- */
-    public void acceptService(Service service) {
+	 *
+	 *
+	 * @param service
+	 */
+    public void acceptService(final Service service) {
         acceptServices.put(service.getServiceName(), service);
     }
 
-    private void sendUserAuthFailure(boolean success) throws IOException {
-        
-        String auths = StringUtil.current().asString(availableAuths.toArray(new String[0]));
-        
+    private void sendUserAuthFailure(final boolean success) throws IOException {
+        if (!success) {
+        	for (final AuthenticationProtocolListener listener : listeners) {
+        		listener.onAuthenticationFailed();
+        	}
+        }
+
+        final String auths = StringUtil.current().asString(availableAuths.toArray(new String[0]));
+
         if (log.isDebugEnabled()) log.debug("Sending auth result (auths: "+auths+", success : " + success + ")");
 
-        SshMsgUserAuthFailure reply = new SshMsgUserAuthFailure(auths, success);
+        final SshMsgUserAuthFailure reply = new SshMsgUserAuthFailure(auths, success);
         transport.sendMessage(reply, this);
     }
 
     /**
  *
  */
-    protected void onStop() {
+    @Override
+	protected void onStop() {
         try {
             // If authentication succeeded then wait for the
             // disconnect and logoff the user
             if (completed) {
                 try {
                     transport.getState().waitForState(TransportProtocolState.DISCONNECTED);
-                } catch (InterruptedException ex) {
+                } catch (final InterruptedException ex) {
                     log.warn("The authentication service was interrupted");
                 }
 
-                NativeAuthenticationProvider nap = NativeAuthenticationProvider.getInstance();
+                final NativeAuthenticationProvider nap = NativeAuthenticationProvider.getInstance();
                 nap.logoffUser();
             }
-        } catch (IOException ex) {
+        } catch (final IOException ex) {
             log.warn("Failed to logoff " + SshThread.getCurrentThreadUser());
         }
     }
 
     private void sendUserAuthSuccess() throws IOException {
-        SshMsgUserAuthSuccess msg = new SshMsgUserAuthSuccess();
-        Service service = (Service) acceptServices.get(serviceToStart);
+    	for (final AuthenticationProtocolListener listener : listeners) {
+    		listener.onAuthenticationComplete();
+    	}
+
+        final SshMsgUserAuthSuccess msg = new SshMsgUserAuthSuccess();
+        final Service service = (Service) acceptServices.get(serviceToStart);
         service.init(Service.ACCEPTING_SERVICE, transport); //, nativeSettings);
         service.start();
         transport.sendMessage(msg, this);
@@ -296,41 +319,35 @@ public class AuthenticationProtocolServer extends AsyncService {
         stop();
     }
 
-    private void onMsgUserAuthRequest(SshMsgUserAuthRequest msg)
+    private void onMsgUserAuthRequest(final SshMsgUserAuthRequest msg)
         throws IOException {
         if (msg.getMethodName().equals("none")) {
             sendUserAuthFailure(false);
         } else {
-            if (attempts >= ((ServerConfiguration) ConfigurationLoader.getConfiguration(
+            if (attempts >= (ConfigurationLoader.getConfiguration(
                         ServerConfiguration.class)).getMaxAuthentications()) {
                 // Too many authentication attempts
                 transport.disconnect("Too many failed authentication attempts");
             } else {
                 // If the service is supported then perfrom the authentication
                 if (acceptServices.containsKey(msg.getServiceName())) {
-                    String method = msg.getMethodName();
+                    final String method = msg.getMethodName();
 
                     if (availableAuths.contains(method)) {
-                        SshAuthenticationServer auth = SshAuthenticationServerFactory.newInstance(method);
+                        final SshAuthenticationServer auth = SshAuthenticationServerFactory.newInstance(method);
                         serviceToStart = msg.getServiceName();
 
-                        //auth.setUsername(msg.getUsername());
-                        int result = auth.authenticate(this, msg); //, nativeSettings);
+                        final int result = auth.authenticate(this, msg);
 
                         if (result == AuthenticationProtocolState.FAILED) {
                             sendUserAuthFailure(false);
                         } else if (result == AuthenticationProtocolState.COMPLETE) {
                             completedAuthentications.add(auth.getMethodName());
 
-                            ServerConfiguration sc = (ServerConfiguration) ConfigurationLoader.getConfiguration(ServerConfiguration.class);
-                            Iterator it = sc.getRequiredAuthentications()
-                                            .iterator();
-
-                            while (it.hasNext()) {
-                                if (!completedAuthentications.contains(
-                                            it.next())) {
+                            final ServerConfiguration sc = ConfigurationLoader.getConfiguration(ServerConfiguration.class);
+                            for (final String required : sc.getRequiredAuthentications()) {
+                                if (!completedAuthentications.contains(required)) {
                                     sendUserAuthFailure(true);
-
                                     return;
                                 }
                             }
@@ -354,7 +371,7 @@ public class AuthenticationProtocolServer extends AsyncService {
     }
 
 	public ConnectionProtocol getConnectionProtocol() {
-		ConnectionProtocol protocol = (ConnectionProtocol) acceptServices.get(ConnectionProtocol.SERVICE_NAME);
+		final ConnectionProtocol protocol = (ConnectionProtocol) acceptServices.get(ConnectionProtocol.SERVICE_NAME);
 		if (protocol == null) {
 			log.warn("No connection protocol found on authentication protocol");
 		}

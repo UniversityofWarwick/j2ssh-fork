@@ -26,13 +26,8 @@
 package com.sshtools.j2ssh.net;
 
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
-import java.net.Socket;
-import java.net.SocketAddress;
+import java.net.InetAddress;
 import java.nio.ByteBuffer;
-import java.nio.channels.ByteChannel;
-import java.nio.channels.Channels;
 import java.nio.channels.ReadableByteChannel;
 import java.nio.channels.SocketChannel;
 import java.nio.channels.WritableByteChannel;
@@ -84,27 +79,17 @@ public class ConnectedSocketChannelTransportProvider implements TransportProvide
     	return socketChannel;
     }
 
-//    public InputStream getInputStream() throws IOException {
-//		return Channels.newInputStream(new ReadableByteChannel() {
-//			public int read(ByteBuffer dst) throws IOException {
-//				return socketChannel.read(dst);
-//			}
-//
-//			public void close() throws IOException {
-//				socketChannel.close();
-//			}
-//
-//			public boolean isOpen() {
-//				return socketChannel.isOpen();
-//			}
-//		});
-//	}
-//
-//	public OutputStream getOutputStream() throws IOException {
-//		return Channels.newOutputStream(socketChannel);
-//	}
-
     public String getProviderDetail() {
-        return socketChannel.toString(); //getRemoteSocketAddress().toString();
+        return socketChannel.toString();
+    }
+
+	@Override
+	public boolean isUsingInetAddress() {
+		return true;
+	}
+
+	@Override
+    public InetAddress getRemoteAddress() {
+    	return socketChannel.socket().getInetAddress();
     }
 }

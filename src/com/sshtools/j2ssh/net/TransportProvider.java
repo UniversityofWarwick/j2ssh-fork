@@ -25,7 +25,8 @@
  */
 package com.sshtools.j2ssh.net;
 
-import java.io.*;
+import java.io.IOException;
+import java.net.InetAddress;
 import java.nio.channels.ReadableByteChannel;
 import java.nio.channels.WritableByteChannel;
 
@@ -62,4 +63,15 @@ public interface TransportProvider {
      * @return
      */
     public String getProviderDetail();
+    
+    /**
+     * @return Whether this transport provider connects to a remote InetAddress
+     */
+    boolean isUsingInetAddress();
+    
+    /**
+     * Returns the remote address <b>Only</b> if {@link #isAddressBased()} returns
+     * true.
+     */
+    InetAddress getRemoteAddress();
 }

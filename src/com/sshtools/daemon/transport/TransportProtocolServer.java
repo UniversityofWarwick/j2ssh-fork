@@ -32,6 +32,8 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Timer;
+import java.util.TimerTask;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -48,6 +50,7 @@ import com.sshtools.j2ssh.transport.MessageAlreadyRegisteredException;
 import com.sshtools.j2ssh.transport.Service;
 import com.sshtools.j2ssh.transport.SshMessage;
 import com.sshtools.j2ssh.transport.SshMsgDisconnect;
+import com.sshtools.j2ssh.transport.SshMsgIgnore;
 import com.sshtools.j2ssh.transport.SshMsgKexInit;
 import com.sshtools.j2ssh.transport.SshMsgServiceRequest;
 import com.sshtools.j2ssh.transport.TransportProtocolCommon;
@@ -61,28 +64,42 @@ import com.sshtools.j2ssh.transport.kex.SshKeyExchange;
 import com.sshtools.j2ssh.transport.publickey.SshKeyPairFactory;
 import com.sshtools.j2ssh.transport.publickey.SshPrivateKey;
 
-
-/**
- *
- *
- * @author $author$
- * @version $Revision: 1.12 $
- */
 public class TransportProtocolServer extends TransportProtocolCommon {
-    private static Log log = LogFactory.getLog(TransportProtocolServer.class);
-    private Map acceptServices = new HashMap();
-    private ServerConfiguration config;
+
+    private static final int NOOP_PING_INTERVAL = 5 * 60 * 1000; // 5 minutes
+	private static final Log log = LogFactory.getLog(TransportProtocolServer.class);
+    private final Map acceptServices = new HashMap();
+    private final ServerConfiguration config;
     private boolean refuse = false;
-    
-    private Date createDate = new Date();
+
+    private AuthenticationProtocolServer authenticationProtocol;
+    private ConnectionProtocol connectionProtocol;
+
+    private final Date createDate = new Date();
+
+    private boolean sendIgnorePings = true;
+    Timer timer = new Timer(true);
 
     /**
- * Creates a new TransportProtocolServer object.
- *
- * @throws IOException
- */
+	 * Creates a new TransportProtocolServer object.
+	 *
+	 * @throws IOException
+	 */
     public TransportProtocolServer() throws IOException {
-        config = (ServerConfiguration) ConfigurationLoader.getConfiguration(ServerConfiguration.class);
+        config = ConfigurationLoader.getConfiguration(ServerConfiguration.class);
+    }
+
+    /**
+     * Constructor which stores the authentication and connection layer protocols being used
+     * with this object. It will also register the authentication protocol as an accepted service,
+     * so you don't need to do that. You will need to set up the authentication protocol to
+     * accept the connection protocol yourself though.
+     */
+    public TransportProtocolServer(final AuthenticationProtocolServer auth, final ConnectionProtocol conn) throws IOException {
+    	this();
+        this.authenticationProtocol = auth;
+        this.connectionProtocol = conn;
+        acceptService(this.authenticationProtocol);
     }
 
     /**
@@ -92,15 +109,23 @@ public class TransportProtocolServer extends TransportProtocolCommon {
  *
  * @throws IOException
  */
-    public TransportProtocolServer(boolean refuse) throws IOException {
+    public TransportProtocolServer(final boolean refuse) throws IOException {
         this();
         this.refuse = refuse;
+    }
+
+    @Override
+    protected void onStop() {
+    	timer.cancel();
+    	timer.purge();
+    	timer = null;
     }
 
     /**
  *
  */
-    protected void onDisconnect() {
+    @Override
+	protected void onDisconnect() {
         acceptServices.clear();
     }
 
@@ -111,39 +136,24 @@ public class TransportProtocolServer extends TransportProtocolCommon {
  *
  * @throws IOException
  */
-    public void acceptService(Service service) throws IOException {
+    public void acceptService(final Service service) throws IOException {
         acceptServices.put(service.getServiceName(), service);
     }
-    
+
     /**
-     * There is no explicit binding from transport layer to authentication layer,
-     * but we ALWAYS configure the transport protocol to accept new authentication
-     * services, so just get it from there.
-     * 
-     * Prepare to be returned null in the event no authentication is set up for some reason.
+     * This will be null unless it was provided in this class's constructor.
+     * It's most likely to be null when it is being configured to reject connections.
      */
     public AuthenticationProtocolServer getAuthenticationProtocolServer() {
-    	AuthenticationProtocolServer server = (AuthenticationProtocolServer) acceptServices.get(AuthenticationProtocolServer.SERVICE_NAME);
-    	if (server == null) {
-    		log.warn("This layer has no authentication layer attached");
-    	}
-    	return server;
+    	return authenticationProtocol;
     }
-    
+
     /**
-     * This gets the connection protocol via the authentication protocol. Any transport
-     * layer accepting connections should return a value, but you should still be prepared
-     * for a null return value.
+     * This will be null unless it was provided in this class's constructor.
+     * It's most likely to be null when it is being configured to reject connections.
      */
     public ConnectionProtocol getConnectionProtocol() {
-    	AuthenticationProtocolServer authServer = getAuthenticationProtocolServer();
-    	if (authServer == null) {
-    		log.warn("Can't get connection protocol as there is no authentication protocol to get it from");
-    		return null;
-    	} else {
-    		return authServer.getConnectionProtocol();
-    	}
-
+    	return connectionProtocol;
     }
 
     /**
@@ -154,7 +164,9 @@ public class TransportProtocolServer extends TransportProtocolCommon {
     public void refuseConnection() throws IOException {
         log.info("Refusing connection");
 
-        // disconnect with max_connections reason
+        // disconnect with max_connections reason.
+        // (we also disconnect for other reasons, but generally only
+        // when hacking attempts are being made)
         sendDisconnect(SshMsgDisconnect.TOO_MANY_CONNECTIONS,
             "Too many connections");
     }
@@ -164,7 +176,8 @@ public class TransportProtocolServer extends TransportProtocolCommon {
  *
  * @throws MessageAlreadyRegisteredException
  */
-    public void registerTransportMessages()
+    @Override
+	public void registerTransportMessages()
         throws MessageAlreadyRegisteredException {
         messageStore.registerMessage(SshMsgServiceRequest.SSH_MSG_SERVICE_REQUEST,
             SshMsgServiceRequest.class);
@@ -175,13 +188,31 @@ public class TransportProtocolServer extends TransportProtocolCommon {
  *
  * @throws IOException
  */
-    protected void startBinaryPacketProtocol() throws IOException {
+    @Override
+	protected void startBinaryPacketProtocol() throws IOException {
         if (refuse) {
             sendKeyExchangeInit();
 
             //sshIn.open();
             refuseConnection();
         } else {
+        	if (sendIgnorePings) {
+	        	timer.scheduleAtFixedRate(new TimerTask(){
+					@Override
+					public void run() {
+						if (!sendIgnorePings) {
+							this.cancel();
+						} else {
+							final SshMsgIgnore ping = new SshMsgIgnore();
+							try {
+								TransportProtocolServer.this.sendMessage(ping, TransportProtocolServer.this);
+							} catch (final IOException e) {
+								disconnect("IOException on ping");
+							}
+						}
+					}
+	            }, NOOP_PING_INTERVAL, NOOP_PING_INTERVAL);
+        	}
             super.startBinaryPacketProtocol();
         }
     }
@@ -193,7 +224,8 @@ public class TransportProtocolServer extends TransportProtocolCommon {
  *
  * @throws AlgorithmNotAgreedException
  */
-    protected String getDecryptionAlgorithm()
+    @Override
+	protected String getDecryptionAlgorithm()
         throws AlgorithmNotAgreedException {
         return determineAlgorithm(clientKexInit.getSupportedCSEncryption(),
             serverKexInit.getSupportedCSEncryption());
@@ -206,7 +238,8 @@ public class TransportProtocolServer extends TransportProtocolCommon {
  *
  * @throws AlgorithmNotAgreedException
  */
-    protected String getEncryptionAlgorithm()
+    @Override
+	protected String getEncryptionAlgorithm()
         throws AlgorithmNotAgreedException {
         return determineAlgorithm(clientKexInit.getSupportedSCEncryption(),
             serverKexInit.getSupportedSCEncryption());
@@ -219,7 +252,8 @@ public class TransportProtocolServer extends TransportProtocolCommon {
  *
  * @throws AlgorithmNotAgreedException
  */
-    protected String getInputStreamCompAlgortihm()
+    @Override
+	protected String getInputStreamCompAlgortihm()
         throws AlgorithmNotAgreedException {
         return determineAlgorithm(clientKexInit.getSupportedCSComp(),
             serverKexInit.getSupportedCSComp());
@@ -232,7 +266,8 @@ public class TransportProtocolServer extends TransportProtocolCommon {
  *
  * @throws AlgorithmNotAgreedException
  */
-    protected String getInputStreamMacAlgorithm()
+    @Override
+	protected String getInputStreamMacAlgorithm()
         throws AlgorithmNotAgreedException {
         return determineAlgorithm(clientKexInit.getSupportedCSMac(),
             serverKexInit.getSupportedCSMac());
@@ -241,7 +276,8 @@ public class TransportProtocolServer extends TransportProtocolCommon {
     /**
  *
  */
-    protected void setLocalIdent() {
+    @Override
+	protected void setLocalIdent() {
         serverIdent = "SSH-" + PROTOCOL_VERSION + "-" +
             SOFTWARE_VERSION_COMMENTS + " [SERVER]";
     }
@@ -251,7 +287,8 @@ public class TransportProtocolServer extends TransportProtocolCommon {
  *
  * @return
  */
-    public String getLocalId() {
+    @Override
+	public String getLocalId() {
         return serverIdent;
     }
 
@@ -260,7 +297,8 @@ public class TransportProtocolServer extends TransportProtocolCommon {
  *
  * @param msg
  */
-    protected void setLocalKexInit(SshMsgKexInit msg) {
+    @Override
+	protected void setLocalKexInit(final SshMsgKexInit msg) {
         log.debug(msg.toString());
         serverKexInit = msg;
     }
@@ -270,7 +308,8 @@ public class TransportProtocolServer extends TransportProtocolCommon {
  *
  * @return
  */
-    protected SshMsgKexInit getLocalKexInit() {
+    @Override
+	protected SshMsgKexInit getLocalKexInit() {
         return serverKexInit;
     }
 
@@ -281,7 +320,8 @@ public class TransportProtocolServer extends TransportProtocolCommon {
  *
  * @throws AlgorithmNotAgreedException
  */
-    protected String getOutputStreamCompAlgorithm()
+    @Override
+	protected String getOutputStreamCompAlgorithm()
         throws AlgorithmNotAgreedException {
         return determineAlgorithm(clientKexInit.getSupportedSCComp(),
             serverKexInit.getSupportedSCComp());
@@ -294,7 +334,8 @@ public class TransportProtocolServer extends TransportProtocolCommon {
  *
  * @throws AlgorithmNotAgreedException
  */
-    protected String getOutputStreamMacAlgorithm()
+    @Override
+	protected String getOutputStreamMacAlgorithm()
         throws AlgorithmNotAgreedException {
         return determineAlgorithm(clientKexInit.getSupportedSCMac(),
             serverKexInit.getSupportedSCMac());
@@ -305,14 +346,16 @@ public class TransportProtocolServer extends TransportProtocolCommon {
  *
  * @param ident
  */
-    protected void setRemoteIdent(String ident) {
+    @Override
+	protected void setRemoteIdent(final String ident) {
         clientIdent = ident;
     }
 
     /**
      * The client ID sent by the remote host when connecting.
      */
-    public String getRemoteId() {
+    @Override
+	public String getRemoteId() {
         return clientIdent;
     }
 
@@ -321,7 +364,8 @@ public class TransportProtocolServer extends TransportProtocolCommon {
  *
  * @param msg
  */
-    protected void setRemoteKexInit(SshMsgKexInit msg) {
+    @Override
+	protected void setRemoteKexInit(final SshMsgKexInit msg) {
         log.debug(msg.toString());
         clientKexInit = msg;
     }
@@ -331,7 +375,8 @@ public class TransportProtocolServer extends TransportProtocolCommon {
  *
  * @return
  */
-    protected SshMsgKexInit getRemoteKexInit() {
+    @Override
+	protected SshMsgKexInit getRemoteKexInit() {
         return clientKexInit;
     }
 
@@ -343,16 +388,17 @@ public class TransportProtocolServer extends TransportProtocolCommon {
  * @throws IOException
  * @throws TransportProtocolException
  */
-    protected SshMsgKexInit createLocalKexInit() throws IOException {
-        SshMsgKexInit msg = new SshMsgKexInit(properties);
-        Map keys = config.getServerHostKeys();
+    @Override
+	protected SshMsgKexInit createLocalKexInit() throws IOException {
+        final SshMsgKexInit msg = new SshMsgKexInit(properties);
+        final Map keys = config.getServerHostKeys();
 
         if (keys.size() > 0) {
-            Iterator it = keys.entrySet().iterator();
-            List available = new ArrayList();
+            final Iterator it = keys.entrySet().iterator();
+            final List available = new ArrayList();
 
             while (it.hasNext()) {
-                Map.Entry entry = (Map.Entry) it.next();
+                final Map.Entry entry = (Map.Entry) it.next();
 
                 if (SshKeyPairFactory.supportsKey(entry.getKey().toString())) {
                     available.add(entry.getKey());
@@ -381,7 +427,8 @@ public class TransportProtocolServer extends TransportProtocolCommon {
  *
  * @throws IOException
  */
-    protected void onStartTransportProtocol() throws IOException {
+    @Override
+	protected void onStartTransportProtocol() throws IOException {
     }
 
     /**
@@ -392,21 +439,22 @@ public class TransportProtocolServer extends TransportProtocolCommon {
  * @throws IOException
  * @throws KeyExchangeException
  */
-    protected void performKeyExchange(SshKeyExchange kex)
+    @Override
+	protected void performKeyExchange(final SshKeyExchange kex)
         throws IOException {
         // Determine the public key algorithm and obtain an instance
-        String keyType = determineAlgorithm(clientKexInit.getSupportedPublicKeys(),
+        final String keyType = determineAlgorithm(clientKexInit.getSupportedPublicKeys(),
                 serverKexInit.getSupportedPublicKeys());
 
         // Create an instance of the public key from the factory
         //SshKeyPair pair = SshKeyPairFactory.newInstance(keyType);
         // Get the configuration and get the relevant host key
-        Map keys = config.getServerHostKeys();
-        Iterator it = keys.entrySet().iterator();
+        final Map keys = config.getServerHostKeys();
+        final Iterator it = keys.entrySet().iterator();
         SshPrivateKey pk; //privateKeyFile = null;
 
         while (it.hasNext()) {
-            Map.Entry entry = (Map.Entry) it.next();
+            final Map.Entry entry = (Map.Entry) it.next();
 
             if (entry.getKey().equals(keyType)) {
                 pk = (SshPrivateKey) entry.getValue();
@@ -428,7 +476,8 @@ public class TransportProtocolServer extends TransportProtocolCommon {
  *
  * @throws IOException
  */
-    protected void onMessageReceived(SshMessage msg) throws IOException {
+    @Override
+	protected void onMessageReceived(final SshMessage msg) throws IOException {
         switch (msg.getMessageId()) {
 	        case SshMsgServiceRequest.SSH_MSG_SERVICE_REQUEST: {
 	            onMsgServiceRequest((SshMsgServiceRequest) msg);
@@ -452,10 +501,11 @@ public class TransportProtocolServer extends TransportProtocolCommon {
  * @throws AlgorithmNotSupportedException
  * @throws AlgorithmInitializationException
  */
-    protected void setupNewKeys(byte[] encryptCSKey, byte[] encryptCSIV,
-        byte[] encryptSCKey, byte[] encryptSCIV, byte[] macCSKey,
-        byte[] macSCKey)
-        throws AlgorithmNotAgreedException, AlgorithmOperationException, 
+    @Override
+	protected void setupNewKeys(final byte[] encryptCSKey, final byte[] encryptCSIV,
+        final byte[] encryptSCKey, final byte[] encryptSCIV, final byte[] macCSKey,
+        final byte[] macSCKey)
+        throws AlgorithmNotAgreedException, AlgorithmOperationException,
             AlgorithmNotSupportedException, AlgorithmInitializationException {
         // Setup the encryption cipher
         SshCipher sshCipher = SshCipherFactory.newInstance(getEncryptionAlgorithm());
@@ -476,10 +526,10 @@ public class TransportProtocolServer extends TransportProtocolCommon {
         algorithmsIn.setHmac(hmac);
     }
 
-    private void onMsgServiceRequest(SshMsgServiceRequest msg)
+    private void onMsgServiceRequest(final SshMsgServiceRequest msg)
         throws IOException {
         if (acceptServices.containsKey(msg.getServiceName())) {
-            Service service = (Service) acceptServices.get(msg.getServiceName());
+            final Service service = (Service) acceptServices.get(msg.getServiceName());
             service.init(Service.ACCEPTING_SERVICE, this);
             service.start();
         } else {
@@ -487,11 +537,11 @@ public class TransportProtocolServer extends TransportProtocolCommon {
                 msg.getServiceName() + " is not available");
         }
     }
-    
+
     public boolean isUnderlyingConnectionAlive() {
     	try {
 			return getProvider().getReadableByteChannel().isOpen();
-		} catch (IOException e) {
+		} catch (final IOException e) {
 			log.error("Error checking if connection is alive", e);
 			return false;
 		}
@@ -499,5 +549,13 @@ public class TransportProtocolServer extends TransportProtocolCommon {
 
 	public Date getCreatedDate() {
 		return createDate;
+	}
+
+	public boolean isSendIgnorePings() {
+		return sendIgnorePings;
+	}
+
+	public void setSendIgnorePings(final boolean sendIgnorePings) {
+		this.sendIgnorePings = sendIgnorePings;
 	}
 }

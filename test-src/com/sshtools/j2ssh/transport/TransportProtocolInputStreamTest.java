@@ -11,10 +11,10 @@ import junit.framework.TestCase;
 public class TransportProtocolInputStreamTest extends TestCase {
 
 	public void testNothing() {
-		
-	}
+
+	} 
 	public void testBasicReading() throws Exception {
-		InputStream socket = new InputStream() {
+		final InputStream socket = new InputStream() {
 			private int count;
 			@Override
 			public int read() throws IOException {
@@ -27,7 +27,7 @@ public class TransportProtocolInputStreamTest extends TestCase {
 				return count;
 			}
 		};
-		TransportProtocolCommon protocol = new TransportProtocolCommon() {
+		final TransportProtocolCommon protocol = new TransportProtocolCommon() {
 			@Override
 			protected String getDecryptionAlgorithm()
 					throws AlgorithmNotAgreedException {
@@ -96,78 +96,84 @@ public class TransportProtocolInputStreamTest extends TestCase {
 			@Override
 			protected void onDisconnect() {
 				// TODO Auto-generated method stub
-				
+
 			}
 
 			@Override
-			protected void onMessageReceived(SshMessage msg) throws IOException {
+			protected void onMessageReceived(final SshMessage msg) throws IOException {
 				// TODO Auto-generated method stub
-				
+
 			}
 
 			@Override
 			protected void onStartTransportProtocol() throws IOException {
 				// TODO Auto-generated method stub
-				
+
 			}
 
 			@Override
-			protected void performKeyExchange(SshKeyExchange kex)
+			protected void performKeyExchange(final SshKeyExchange kex)
 					throws IOException, KeyExchangeException {
 				// TODO Auto-generated method stub
-				
+
 			}
 
 			@Override
 			public void registerTransportMessages()
 					throws MessageAlreadyRegisteredException {
 				// TODO Auto-generated method stub
-				
+
 			}
 
 			@Override
 			protected void setLocalIdent() {
 				// TODO Auto-generated method stub
-				
+
 			}
 
 			@Override
-			protected void setLocalKexInit(SshMsgKexInit msg) {
+			protected void setLocalKexInit(final SshMsgKexInit msg) {
 				// TODO Auto-generated method stub
-				
+
 			}
 
 			@Override
-			protected void setRemoteIdent(String ident) {
+			protected void setRemoteIdent(final String ident) {
 				// TODO Auto-generated method stub
-				
+
 			}
 
 			@Override
-			protected void setRemoteKexInit(SshMsgKexInit msg) {
+			protected void setRemoteKexInit(final SshMsgKexInit msg) {
 				// TODO Auto-generated method stub
-				
+
 			}
 
 			@Override
-			protected void setupNewKeys(byte[] encryptCSKey,
-					byte[] encryptCSIV, byte[] encryptSCKey,
-					byte[] encryptSCIV, byte[] macCSKey, byte[] macSCKey)
+			protected void setupNewKeys(final byte[] encryptCSKey,
+					final byte[] encryptCSIV, final byte[] encryptSCKey,
+					final byte[] encryptSCIV, final byte[] macCSKey, final byte[] macSCKey)
 					throws AlgorithmNotAgreedException,
 					AlgorithmOperationException,
 					AlgorithmNotSupportedException,
 					AlgorithmInitializationException {
 				// TODO Auto-generated method stub
-				
+
 			}
-			
+
+			@Override
+			protected void onStop() {
+				// TODO Auto-generated method stub
+
+			}
+
 		};
-		TransportProtocolInputStream tpis = new TransportProtocolInputStream(protocol, socket, null);
-		
-		byte[] targetBuffer = new byte[1024];
+		final TransportProtocolInputStream tpis = new TransportProtocolInputStream(protocol, socket, null);
+
+		final byte[] targetBuffer = new byte[1024];
 		targetBuffer[50] = -10;
 		targetBuffer[51] = -9;
-		int amountRead = tpis.readBufferedData(targetBuffer, 0, 50);
+		final int amountRead = tpis.readBufferedData(targetBuffer, 0, 50);
 		assertEquals(50, amountRead);
 		assertEquals(1, targetBuffer[0]);
 		assertEquals(50, targetBuffer[49]);

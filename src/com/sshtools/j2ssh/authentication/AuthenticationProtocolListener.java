@@ -47,8 +47,6 @@ package com.sshtools.j2ssh.authentication;
  * @version $Id: AuthenticationProtocolListener.java,v 1.8 2003/09/11 15:35:01 martianx Exp $
  */
 public interface AuthenticationProtocolListener {
-    /**
-     *
-     */
     public void onAuthenticationComplete();
+    public void onAuthenticationFailed();
 }

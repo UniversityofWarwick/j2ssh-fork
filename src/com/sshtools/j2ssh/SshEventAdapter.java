@@ -29,48 +29,28 @@ import com.sshtools.j2ssh.authentication.AuthenticationProtocolListener;
 import com.sshtools.j2ssh.transport.TransportProtocol;
 import com.sshtools.j2ssh.transport.TransportProtocolEventHandler;
 
-
-/**
- *
- *
- * @author $author$
- * @version $Revision: 1.8 $
- */
 public class SshEventAdapter implements TransportProtocolEventHandler,
     AuthenticationProtocolListener {
-    /**
-     * Creates a new SshEventAdapter object.
-     */
-    public SshEventAdapter() {
-    }
 
-    /**
-     *
-     *
-     * @param transport
-     */
+    public SshEventAdapter() {}
+
+    @Override
     public void onSocketTimeout(TransportProtocol transport) {
     }
 
-    /**
-     *
-     *
-     * @param transport
-     */
+    @Override
     public void onDisconnect(TransportProtocol transport) {
     }
 
-    /**
-     *
-     *
-     * @param transport
-     */
+    @Override
     public void onConnected(TransportProtocol transport) {
     }
 
-    /**
-     *
-     */
+    @Override
     public void onAuthenticationComplete() {
     }
+
+	@Override
+	public void onAuthenticationFailed() {
+	}
 }

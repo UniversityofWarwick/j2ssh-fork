@@ -59,10 +59,10 @@ import com.sshtools.j2ssh.transport.publickey.SshPrivateKeyFile;
  */
 public class ServerConfiguration extends DefaultHandler {
     private static Log log = LogFactory.getLog(ServerConfiguration.class);
-    private Map allowedSubsystems = new HashMap();
-    private Map serverHostKeys = new HashMap();
-    private List<String> allowedAuthentications = new ArrayList<String>();
-    private List<String> requiredAuthentications = new ArrayList<String>();
+    private final Map allowedSubsystems = new HashMap();
+    private final Map serverHostKeys = new HashMap();
+    private final List<String> allowedAuthentications = new ArrayList<String>();
+    private final List<String> requiredAuthentications = new ArrayList<String>();
     private int commandPort = 12222;
     private int port = 22;
     private String listenAddress = "0.0.0.0";
@@ -76,7 +76,7 @@ public class ServerConfiguration extends DefaultHandler {
     private String currentElement = null;
     private int minimumWindowSpace;
     private int maximumWindowSpace;
-    private Class sessionChannelImpl = SessionChannelServer.class;
+    private Class sessionChannelImpl = SessionChannelServer.class; 
 
     /**
  * Creates a new ServerConfiguration object.
@@ -87,7 +87,7 @@ public class ServerConfiguration extends DefaultHandler {
  * @throws ParserConfigurationException
  * @throws IOException
  */
-    public ServerConfiguration(InputStream in)
+    public ServerConfiguration(final InputStream in)
         throws SAXException, ParserConfigurationException, IOException {
         reload(in);
     }
@@ -101,7 +101,7 @@ public class ServerConfiguration extends DefaultHandler {
  * @throws ParserConfigurationException
  * @throws IOException
  */
-    public void reload(InputStream in)
+    public void reload(final InputStream in)
         throws SAXException, ParserConfigurationException, IOException {
         allowedSubsystems.clear();
         serverHostKeys.clear();
@@ -118,12 +118,12 @@ public class ServerConfiguration extends DefaultHandler {
         authenticationBanner = "";
         allowTcpForwarding = true;
         currentElement = null;
-        
+
         minimumWindowSpace = 1024 * 1024; // 1MB
         maximumWindowSpace = 1024 * 1024 * 3; // 3MB
 
-        SAXParserFactory saxFactory = SAXParserFactory.newInstance();
-        SAXParser saxParser = saxFactory.newSAXParser();
+        final SAXParserFactory saxFactory = SAXParserFactory.newInstance();
+        final SAXParser saxParser = saxFactory.newSAXParser();
         saxParser.parse(in, this);
     }
 
@@ -137,8 +137,9 @@ public class ServerConfiguration extends DefaultHandler {
  *
  * @throws SAXException
  */
-    public void startElement(String uri, String localName, String qname,
-        Attributes attrs) throws SAXException {
+    @Override
+	public void startElement(final String uri, final String localName, final String qname,
+        final Attributes attrs) throws SAXException {
         if (currentElement == null) {
             if (!qname.equals("ServerConfiguration")) {
                 throw new SAXException("Unexpected root element " + qname);
@@ -166,23 +167,23 @@ public class ServerConfiguration extends DefaultHandler {
 
                     try {
                         if (f.exists()) {
-                            SshPrivateKeyFile pkf = SshPrivateKeyFile.parse(f);
-                            SshPrivateKey key = pkf.toPrivateKey(null);
+                            final SshPrivateKeyFile pkf = SshPrivateKeyFile.parse(f);
+                            final SshPrivateKey key = pkf.toPrivateKey(null);
                             serverHostKeys.put(key.getAlgorithmName(), key);
                         } else {
                             log.warn("Private key file '" + privateKey +
                                 "' could not be found");
                         }
-                    } catch (InvalidSshKeyException ex) {
+                    } catch (final InvalidSshKeyException ex) {
                         log.warn("Failed to load private key '" + privateKey, ex);
-                    } catch (IOException ioe) {
+                    } catch (final IOException ioe) {
                         log.warn("Failed to load private key '" + privateKey,
                             ioe);
                     }
                 } else if (qname.equals("Subsystem")) {
-                    String type = attrs.getValue("Type");
-                    String name = attrs.getValue("Name");
-                    String provider = attrs.getValue("Provider");
+                    final String type = attrs.getValue("Type");
+                    final String name = attrs.getValue("Name");
+                    final String provider = attrs.getValue("Provider");
 
                     if ((type == null) || (name == null) || (provider == null)) {
                         throw new SAXException(
@@ -224,9 +225,10 @@ public class ServerConfiguration extends DefaultHandler {
  *
  * @throws SAXException
  */
-    public void characters(char[] ch, int start, int length)
+    @Override
+	public void characters(final char[] ch, final int start, final int length)
         throws SAXException {
-        String value = new String(ch, start, length);
+        final String value = new String(ch, start, length);
 
         if (currentElement != null) {
             if (currentElement.equals("AuthenticationBanner")) {
@@ -266,7 +268,7 @@ public class ServerConfiguration extends DefaultHandler {
             } else if (currentElement.equals("SessionChannelImpl")) {
                 try {
                     sessionChannelImpl = ConfigurationLoader.getExtensionClass(value);
-                } catch (Exception e) {
+                } catch (final Exception e) {
                     log.error("Failed to load SessionChannelImpl " + value, e);
                 }
             } else if (currentElement.equals("MaxAuthentications")) {
@@ -293,7 +295,8 @@ public class ServerConfiguration extends DefaultHandler {
  *
  * @throws SAXException
  */
-    public void endElement(String uri, String localName, String qname)
+    @Override
+	public void endElement(final String uri, final String localName, final String qname)
         throws SAXException {
         if (currentElement != null) {
             if (!currentElement.equals(qname)) {
@@ -330,7 +333,7 @@ public class ServerConfiguration extends DefaultHandler {
  *
  * @return
  */
-    public List getRequiredAuthentications() {
+    public List<String> getRequiredAuthentications() {
         return requiredAuthentications;
     }
 
@@ -454,8 +457,9 @@ public class ServerConfiguration extends DefaultHandler {
  *
  * @return
  */
-    public String toString() {
-        StringBuilder xml = new StringBuilder("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n");
+    @Override
+	public String toString() {
+        final StringBuilder xml = new StringBuilder("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n");
         xml.append("<!-- Server configuration file - If filenames are not absolute they are assummed to be in the same directory as this configuration file. -->\n");
         xml.append("<ServerConfiguration>\n");
         xml.append("   <!-- The available host keys for server authentication -->\n");
@@ -508,7 +512,7 @@ public class ServerConfiguration extends DefaultHandler {
         }
 
         xml.append("   <!-- Specify any number of required authentications -->\n");
-        for (String auth : requiredAuthentications) {
+        for (final String auth : requiredAuthentications) {
             xml .append("   <RequiredAuthentication>" + auth +
             "</RequiredAuthentication>\n");
         }
@@ -519,11 +523,11 @@ public class ServerConfiguration extends DefaultHandler {
         xml.append("   <!-- The users configuration directory where files such as AuthorizationFile are found. For users home directory specify %D For users name specify %U  -->\n");
         xml.append("   <UserConfigDirectory>" + userConfigDirectory + "</UserConfigDirectory>\n");
         xml.append("   <AllowTcpForwarding>" + String.valueOf(allowTcpForwarding) + "</AllowTcpForwarding>\n");
-        
+
         comment(xml, "Window space limits for session channel server");
         element(xml, "MinimumWindowSpace", minimumWindowSpace);
         element(xml, "MaximumWindowSpace", maximumWindowSpace);
-        
+
         xml.append("</ServerConfiguration>\n");
 
         return xml.toString();
@@ -536,13 +540,13 @@ public class ServerConfiguration extends DefaultHandler {
 	public final int getMaximumWindowSpace() {
 		return maximumWindowSpace;
 	}
-	
+
 	private static void comment(final StringBuilder sb, final String comment) {
 		sb.append("  <!-- ");
 		sb.append(comment);
 		sb.append("-->\n");
 	}
-	
+
 	private static void element(final StringBuilder sb, final String name, final Object value) {
 		sb.append("  <");
 		sb.append(name);
