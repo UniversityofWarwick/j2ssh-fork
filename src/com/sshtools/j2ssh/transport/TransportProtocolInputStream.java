@@ -32,7 +32,6 @@ import java.io.InputStream;
 import java.io.InterruptedIOException;
 import java.math.BigInteger;
 import java.net.SocketException;
-import java.util.Iterator;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -52,6 +51,7 @@ import com.sshtools.j2ssh.transport.hmac.SshHmac;
 class TransportProtocolInputStream {
     private static Log log = LogFactory.getLog(TransportProtocolInputStream.class);
     private static final int DEFAULT_CIPHER_LENGTH = 8;
+	private static final int MAX_BUFFER_SIZE = 2 * 1024 * 1024; // 2meg
     private long bytesTransfered = 0;
     private final InputStream in;
     private Object sequenceLock = new Object();
@@ -284,12 +284,17 @@ class TransportProtocolInputStream {
         }
         if (log.isDebugEnabled()) log.debug("Finished reading message");
     
+        if (messageBytes.size() > MAX_BUFFER_SIZE) {
+        	throw new IOException("Message buffer grew too large: " + messageBytes.size());
+        }
 
         synchronized (sequenceLock) {
             if (hmac != null) {
                 read = readBufferedData(data, 0, maclen);
 
                 messageBytes.write(data, 0, read);
+                
+                //log.info("TransportProtocolInputStream messageBytqes = " + messageBytes.size());
 
                 // Verify the mac
                 if (!hmac.verify(sequenceNo, messageBytes.toByteArray())) {

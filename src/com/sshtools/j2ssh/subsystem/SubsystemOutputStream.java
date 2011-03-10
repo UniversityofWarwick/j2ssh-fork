@@ -25,19 +25,15 @@
  */
 package com.sshtools.j2ssh.subsystem;
 
-import com.sshtools.j2ssh.io.ByteArrayReader;
-import com.sshtools.j2ssh.sftp.IncompleteMessage;
-import com.sshtools.j2ssh.transport.InvalidMessageException;
-
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
-import java.util.Date;
-import java.util.Timer;
-import java.util.TimerTask;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+
+import com.sshtools.j2ssh.io.ByteArrayReader;
+import com.sshtools.j2ssh.transport.InvalidMessageException;
 
 
 /**
@@ -57,6 +53,9 @@ public class SubsystemOutputStream extends OutputStream {
 	private static final int LENGTH_BYTES = 4;
 
 	private static final Log LOG = LogFactory.getLog(SubsystemOutputStream.class);
+	
+	private static final int MAX_BUFFER_SIZE = 2*1024*1024; //2meg
+	private static final int FORCE_RESET_SIZE = 1*1024*1024; //1meg
 	
     // Temporary storage buffer to build up a message
 	private ByteArrayOutputStream buffer = new ByteArrayOutputStream();
@@ -89,7 +88,7 @@ public class SubsystemOutputStream extends OutputStream {
     public void write(byte[] b, int off, int len) throws IOException {
         // Write the data
     	//LOG.debug(String.format("[SSOS]write(byte[%d],%d,%d", b.length, off, len));
-        super.write(b, off, len);
+        super.write(b, off, len);        
         processMessage();
     }
     
@@ -117,10 +116,16 @@ public class SubsystemOutputStream extends OutputStream {
     private void processMessage() throws IOException {
     	synchronized(buffer) {
 	        // Now try to process a message
+    		if (buffer.size() > MAX_BUFFER_SIZE) {
+    			// Buffer should never grow this big.
+    			throw new IOException("Buffer grew too large: " + buffer.size());
+    		}
+    		
 	        if (buffer.size() > (messageStart + LENGTH_BYTES)) {
+	        	
 	        	//Messagelength is the length of data AFTER the 4 bytes containing the length.
-	            int messageLength = (int) ByteArrayReader.readInt(buffer.toByteArray(),
-	                    messageStart);
+	            byte[] byteArray = buffer.toByteArray();
+				int messageLength = (int) ByteArrayReader.readInt(byteArray, messageStart);
 	            //int messageType = buffer.toByteArray()[messageStart + LENGTH_BYTES];
 	            
 	            if (messageLength + messageStart <= (buffer.size() - LENGTH_BYTES)) {
@@ -128,7 +133,7 @@ public class SubsystemOutputStream extends OutputStream {
 	                byte[] msgdata = new byte[messageLength];
 	                
 	                // Process a message
-	                System.arraycopy(buffer.toByteArray(), messageStart + LENGTH_BYTES,
+	                System.arraycopy(byteArray, messageStart + LENGTH_BYTES,
 	                    msgdata, 0, messageLength);
 	
 	                try {
@@ -147,10 +152,18 @@ public class SubsystemOutputStream extends OutputStream {
 	                } else {
 	                	int remaining = buffer.size() - (LENGTH_BYTES + messageLength + messageStart);
 	                    messageStart += messageLength + LENGTH_BYTES;
-	                    if (LOG.isDebugEnabled()) LOG.debug("Start buffer at " + messageStart);
-	                    //write() may not get called again, so
-	                    //we need to check whether these extra bytes are a whole
-	                    //message. Otherwise it will be stuck in buffer limbo.
+	                    
+	                    if (messageStart > FORCE_RESET_SIZE) {
+	                    	if (LOG.isDebugEnabled()) LOG.debug("Shifting large buffer back to start. messageStart=" + messageStart);
+	                    	buffer.reset();
+	                    	buffer.write(byteArray, messageStart, remaining);
+	                    	messageStart = 0;
+	                    } else {
+		                    if (LOG.isDebugEnabled()) LOG.debug("Start buffer at " + messageStart);
+		                    //write() may not get called again, so
+		                    //we need to check whether these extra bytes are a whole
+		                    //message. Otherwise it will be stuck in buffer limbo.
+	                    }
 	                    processMessage();
 	                }
 	            } else {

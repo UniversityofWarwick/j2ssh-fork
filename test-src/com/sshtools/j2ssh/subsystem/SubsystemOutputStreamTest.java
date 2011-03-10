@@ -1,5 +1,6 @@
 package com.sshtools.j2ssh.subsystem;
 
+import java.io.ByteArrayOutputStream;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -55,6 +56,56 @@ public class SubsystemOutputStreamTest extends TestCase {
 		os.close();
 		
 		assertEquals(3, store.getMessages().size());
+	}
+	
+	/**
+	 * If incoming data contains the end of one message and the start
+	 * of another, we will simply advance a marker to the start of the new
+	 * message rather than copy bytes and reset the buffer. This is fine
+	 * every now and again but if a client repeatedly does it eventually the
+	 * buffer will become oversized.
+	 * 
+	 * Fix is to force a buffer reset after some threshold (copying the trailing
+	 * data to the start)
+	 */
+	public void testConstantlyOverlappingMessages() throws Exception {
+		MockMessageStore store = new MockMessageStore("testMessages");
+		SubsystemOutputStream os = new SubsystemOutputStream(store);
+		
+		// Build a message
+		ByteArrayOutputStream bas = new ByteArrayOutputStream();
+		int length = 1024*8;
+		bas.write(toByteArray(length));
+		for (int i=0; i<length; i++) {
+			bas.write(5); // any byte data, value isn't important.
+		}
+		byte[] message1 = bas.toByteArray();
+		
+		// Build an array with the end of the message rotated to the front,
+		// so we can repeatedly pass this to the output stream
+		ByteArrayOutputStream joined = new ByteArrayOutputStream();
+		joined.write(message1, 1024, message1.length-1024);
+		joined.write(message1, 0, 1024);
+		byte[] joinedArray = joined.toByteArray();
+		
+		// Send the first part of a message before joinedArray, else it will be garbage
+		os.write(message1, 0, 1024);
+		for (int i=0; i<1000; i++) {
+			os.write(joinedArray);
+		}
+		os.write(message1, 1024, message1.length-1024);
+		
+		assertEquals(1001, store.getMessages().size());
+		assertEquals(length, store.getMessages().get(0).length);
+	}
+	
+	private byte[] toByteArray(int value) {
+		return new byte[]{
+			(byte)(value >>> 24),
+            (byte)(value >>> 16),
+            (byte)(value >>> 8),
+            (byte)value
+		};
 	}
 	
 	/**
