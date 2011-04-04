@@ -338,7 +338,10 @@ public class SshMsgKexInit extends SshMessage {
         return ret;
     }
 
-    private List sortAlgorithmList(List list, String pref) {
+    private List sortAlgorithmList(List noEditList, String pref) {
+    	//FLE-983 some of these lists are shared, so make a copy before mutating 
+    	List list = new ArrayList(noEditList);
+    	
         if (list.contains(pref)) {
             // Remove the prefered from the list wherever it may be
             list.remove(pref);
