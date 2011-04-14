@@ -251,7 +251,7 @@ public class ConnectionProtocol extends AsyncService {
                 // TODO necessary? already synced on channel and this is the only place the window is modified
                 synchronized(window) {	                
 	                // Don't do anything until we have some window space.
-	                //window.waitForWindowSpace(1);
+	                window.waitForWindowSpace(1, 10);
 	                
 	                long windowSpace = window.getWindowSpace();
 	                
@@ -262,7 +262,7 @@ public class ConnectionProtocol extends AsyncService {
 	                block = (int)Math.min(remaining, Math.min(windowSpace, channel.getRemotePacketSize()));
 	                if (block < 1) {
 	                	emptyBlockAttempts++;
-	                	if (emptyBlockAttempts > 1000) {
+	                	if (emptyBlockAttempts > 10) {
 	                		throw new IOException("No window to send data to. windowSpace="+windowSpace+", remotePacketSize="+channel.getRemotePacketSize());
 	                	}
 	                	continue;

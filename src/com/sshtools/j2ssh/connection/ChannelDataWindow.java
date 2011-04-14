@@ -127,15 +127,17 @@ public class ChannelDataWindow {
      *
      * @param minimum
      */
-    public synchronized void waitForWindowSpace(int minimum) {
+    public synchronized void waitForWindowSpace(int minimum, int count) {
         if (log.isDebugEnabled() && windowSpace < minimum) {
             log.debug(name+": Waiting for " + String.valueOf(minimum) +
-                " bytes of window space");
+                " bytes of window space : " + count + " + times.");
         }
 
-        while (windowSpace < minimum) {
+        int currentCount = 0;
+        while (windowSpace < minimum && currentCount < count) {
             try {
-                wait();
+                currentCount ++;
+                wait(50);
             } catch (InterruptedException e) {
             }
         }
