@@ -80,7 +80,7 @@ public class KBIPasswordAuthenticationServer extends SshAuthenticationServer {
 
         if (authImpl == null) {
             log.error(
-                "Cannot perfrom authentication witout native authentication provider");
+                "Cannot perfrom authentication without native authentication provider");
 
             return AuthenticationProtocolState.FAILED;
         }
